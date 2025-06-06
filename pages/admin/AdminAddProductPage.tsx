@@ -1,15 +1,15 @@
 
 import React, { useState } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
 import { Product, ProductCategory } from '../../types';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import { THEME_COLORS } from '../../constants';
 import { useNavigate } from 'react-router-dom';
-import { generateProductDescription, ImageInput } from '../../utils/geminiApi'; // Import Gemini API util and ImageInput
+import { generateProductDescription, ImageInput } from '../../utils/geminiApi';
+import { addItem, STORES } from '../../database';
 
-// Helper to convert file to base64 and get mimeType
+
 const fileToImageInput = (file: File): Promise<ImageInput> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -20,7 +20,6 @@ const fileToImageInput = (file: File): Promise<ImageInput> => {
       if (match && match[1] && match[2]) {
         resolve({ mimeType: match[1], data: match[2] });
       } else {
-        // Fallback for safety, though readAsDataURL should produce this format
         resolve({ mimeType: file.type || 'application/octet-stream', data: dataUrl.split(',')[1] });
       }
     };
@@ -30,7 +29,6 @@ const fileToImageInput = (file: File): Promise<ImageInput> => {
 
 
 const AdminAddProductPage: React.FC = () => {
-  const [products, setProducts] = useLocalStorage<Product[]>('products', []);
   const navigate = useNavigate();
 
   const initialFormState: Omit<Product, 'id' | 'images'> = {
@@ -86,8 +84,8 @@ const AdminAddProductPage: React.FC = () => {
       const description = await generateProductDescription(
         newProduct.name, 
         newProduct.category, 
-        newProduct.description, // Pass current description as notes
-        imageInput // Pass the image data
+        newProduct.description, 
+        imageInput 
       );
       setNewProduct(prev => ({ ...prev, description }));
     } catch (error: any) {
@@ -107,7 +105,6 @@ const AdminAddProductPage: React.FC = () => {
     }
 
     try {
-      // Convert all selected files to base64 data URLs for storage
       const imagePromises = Array.from(selectedImageFiles).map(file => {
         return new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -124,7 +121,7 @@ const AdminAddProductPage: React.FC = () => {
         images: base64Images,
       };
 
-      setProducts(prevProducts => [...prevProducts, productToAdd]);
+      await addItem<Product>(STORES.PRODUCTS, productToAdd);
       setNewProduct(initialFormState); 
       setSelectedImageFiles(null); 
       const fileInput = document.getElementById('imageFiles') as HTMLInputElement;
@@ -136,8 +133,8 @@ const AdminAddProductPage: React.FC = () => {
       navigate('/admin/dashboard/products');
 
     } catch (error) {
-      console.error("Error processing images for saving:", error);
-      setFormError("حدث خطأ أثناء معالجة الصور للحفظ. يرجى المحاولة مرة أخرى.");
+      console.error("Error processing images for saving or adding product to DB:", error);
+      setFormError("حدث خطأ أثناء إضافة المنتج. يرجى المحاولة مرة أخرى.");
     }
   };
 

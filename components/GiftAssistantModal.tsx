@@ -11,7 +11,7 @@ import { suggestGifts, GiftSuggestionInput, GiftSuggestion } from '../utils/gemi
 interface GiftAssistantModalProps {
   isOpen: boolean;
   onClose: () => void;
-  availableProducts: Product[];
+  availableProducts: Product[]; // This will be populated by HomePage from IndexedDB
 }
 
 const GiftAssistantModal: React.FC<GiftAssistantModalProps> = ({ isOpen, onClose, availableProducts }) => {
@@ -47,6 +47,12 @@ const GiftAssistantModal: React.FC<GiftAssistantModalProps> = ({ isOpen, onClose
     setError(null);
     setSuggestions([]);
     setNoMatchMessage(null);
+
+    if (availableProducts.length === 0) {
+        setError("قائمة المنتجات غير متوفرة حالياً. يرجى المحاولة لاحقاً.");
+        setIsLoading(false);
+        return;
+    }
 
     const productDataForApi = availableProducts.map(p => ({
       id: p.id,
@@ -127,9 +133,10 @@ const GiftAssistantModal: React.FC<GiftAssistantModalProps> = ({ isOpen, onClose
               {budgetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
-          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={isLoading}>
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={isLoading || availableProducts.length === 0}>
             {isLoading ? "✨ جاري البحث..." : "ابحث عن الهدية المثالية ✨"}
           </Button>
+           {availableProducts.length === 0 && !isLoading && <p className="text-xs text-amber-500 text-center mt-2">قائمة المنتجات لا تزال قيد التحميل، يرجى الانتظار قليلاً.</p>}
         </form>
       )}
 

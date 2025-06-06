@@ -26,7 +26,6 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({ onLogout, c
     { name: 'إضافة منتج جديد', path: '/admin/dashboard/add-product' },
     { name: 'إعدادات التواصل', path: '/admin/dashboard/contact-settings' },
     { name: 'إعدادات المظهر', path: '/admin/dashboard/appearance-settings' },
-    { name: 'النسخ الاحتياطي والاستعادة', path: '/admin/dashboard/data-management' },
   ];
 
   const activeStyle = `${THEME_COLORS.buttonGold} ${THEME_COLORS.textPrimary}`;

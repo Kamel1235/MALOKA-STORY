@@ -1,16 +1,14 @@
 
-import React, { useState } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
+import React, { useState, useEffect } from 'react';
 import { Product, ProductCategory } from '../../types';
-import { INITIAL_PRODUCTS } from '../../data/mockProducts';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import Modal from '../../components/ui/Modal';
 import { THEME_COLORS } from '../../constants';
-import { generateProductDescription, ImageInput } from '../../utils/geminiApi'; // Import Gemini API util and ImageInput
+import { generateProductDescription, ImageInput } from '../../utils/geminiApi';
+import { getAllItems, updateItem, deleteItemById, STORES } from '../../database';
 
-// Helper to convert file to base64 and get mimeType
 const fileToImageInputOnEdit = (file: File): Promise<ImageInput> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -28,9 +26,8 @@ const fileToImageInputOnEdit = (file: File): Promise<ImageInput> => {
   });
 };
 
-// Helper to extract base64 and mimeType from existing Data URL
 const extractImageDataFromDataUrl = (dataUrl: string): ImageInput | null => {
-  const match = dataUrl.match(/^data:(image\/\w+);base64,(.*)$/); // Specifically for images
+  const match = dataUrl.match(/^data:(image\/\w+);base64,(.*)$/);
   if (match && match[1] && match[2]) {
     return { mimeType: match[1], data: match[2] };
   }
@@ -38,7 +35,8 @@ const extractImageDataFromDataUrl = (dataUrl: string): ImageInput | null => {
 }
 
 const AdminProductsPage: React.FC = () => {
-  const [products, setProducts] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,6 +44,23 @@ const AdminProductsPage: React.FC = () => {
   
   const [isGeneratingDescInModal, setIsGeneratingDescInModal] = useState(false);
   const [descGenerationErrorInModal, setDescGenerationErrorInModal] = useState<string | null>(null);
+
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    try {
+      const dbProducts = await getAllItems<Product>(STORES.PRODUCTS);
+      setProducts(dbProducts);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      setProducts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   const openEditModal = (product: Product) => {
     setCurrentProduct(JSON.parse(JSON.stringify(product))); 
@@ -143,38 +158,38 @@ const AdminProductsPage: React.FC = () => {
         return; 
       }
     }
-
-    setProducts(prevProducts => 
-      prevProducts.map(p => p.id === productToSave.id ? productToSave : p)
-    );
-    closeEditModal();
+    try {
+        await updateItem<Product>(STORES.PRODUCTS, productToSave);
+        fetchProducts(); // Re-fetch products to update the list
+        closeEditModal();
+    } catch (error) {
+        console.error("Error saving product:", error);
+        alert("حدث خطأ أثناء حفظ المنتج. يرجى المحاولة مرة أخرى.");
+    }
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    // TEMPORARILY REMOVED window.confirm FOR DIRECT TESTING
-    console.log(`[AdminProductsPage] handleDeleteProduct called for ID: ${productId}. Bypassing confirm for test.`);
-    alert(`TEST: Attempting to delete product ID: ${productId}. Check console.`); // For immediate feedback
-
-    setProducts(prevProducts => {
-      console.log(`[AdminProductsPage] Current products before filtering (ID: ${productId}):`, JSON.parse(JSON.stringify(prevProducts)));
-      const updatedProducts = prevProducts.filter(p => p.id !== productId);
-      console.log(`[AdminProductsPage] Products after filtering (ID: ${productId}):`, JSON.parse(JSON.stringify(updatedProducts)));
-      if (prevProducts.length === updatedProducts.length) {
-        console.warn(`[AdminProductsPage] Product with ID ${productId} was not found or filter failed.`);
+  const handleDeleteProduct = async (productId: string) => {
+    if (window.confirm('هل أنت متأكد أنك تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.')) {
+      try {
+        await deleteItemById(STORES.PRODUCTS, productId);
+        fetchProducts(); // Re-fetch products
+      } catch (error) {
+        console.error("Error deleting product:", error);
+        alert("حدث خطأ أثناء حذف المنتج.");
       }
-      return updatedProducts;
-    });
-    console.log(`[AdminProductsPage] setProducts call completed for product ID: ${productId}. Check UI and localStorage.`);
-    // You can re-add window.confirm later:
-    // if (window.confirm('هل أنت متأكد أنك تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.')) {
-    //   setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-    // }
+    }
   };
   
   const filteredProducts = products.filter(product => 
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isLoading) {
+    return <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl text-center ${THEME_COLORS.textSecondary}`}>
+        جاري تحميل المنتجات...
+    </div>;
+  }
 
   return (
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl`}>
@@ -222,10 +237,7 @@ const AdminProductsPage: React.FC = () => {
                     <Button 
                         size="sm" 
                         variant="danger" 
-                        onClick={() => {
-                            console.log(`[AdminProductsPage] Delete button clicked for product ID: ${product.id}`);
-                            handleDeleteProduct(product.id);
-                        }}
+                        onClick={() => handleDeleteProduct(product.id)}
                         className="w-full sm:w-auto"
                     >
                         حذف

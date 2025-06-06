@@ -1,20 +1,35 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { THEME_COLORS, INITIAL_CONTACT_INFO } from '../constants';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
-import useLocalStorage from '../hooks/useLocalStorage';
 import { ContactInfo } from '../types';
+import { getSetting, SETTING_KEYS } from '../database';
 
 const ContactPage: React.FC = () => {
-  const [contactInfo] = useLocalStorage<ContactInfo>('contactInformation', INITIAL_CONTACT_INFO);
+  const [contactInfo, setContactInfo] = useState<ContactInfo>(INITIAL_CONTACT_INFO);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchContactInfo = async () => {
+      setIsLoading(true);
+      try {
+        const dbContactInfo = await getSetting<ContactInfo>(SETTING_KEYS.CONTACT_INFO, INITIAL_CONTACT_INFO);
+        setContactInfo(dbContactInfo);
+      } catch (error) {
+        console.error("Error fetching contact info:", error);
+        setContactInfo(INITIAL_CONTACT_INFO); // Fallback to initial
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchContactInfo();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Basic alert, can be expanded with actual email sending logic or other integrations.
     alert("شكراً لرسالتك! سنتواصل معك في أقرب وقت.\n ملاحظة: هذه مجرد رسالة تجريبية، لم يتم إرسال بيانات فعلية.");
-    // Reset form if needed by managing form state
     (e.target as HTMLFormElement).reset(); 
   };
 
@@ -23,6 +38,14 @@ const ContactPage: React.FC = () => {
     { name: 'انستجرام', href: contactInfo.instagram, show: contactInfo.instagram && contactInfo.instagram !== '#' },
     { name: 'تيك توك', href: contactInfo.tiktok, show: contactInfo.tiktok && contactInfo.tiktok !== '#' },
   ].filter(link => link.show);
+
+  if (isLoading) {
+    return (
+      <div className={`min-h-screen ${THEME_COLORS.background} py-12 px-4 sm:px-6 lg:px-8 flex justify-center items-center`}>
+        <p className={`${THEME_COLORS.textPrimary} text-xl`}>جاري تحميل معلومات الاتصال...</p>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${THEME_COLORS.background} py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-indigo-950 via-purple-800 to-indigo-950`}>

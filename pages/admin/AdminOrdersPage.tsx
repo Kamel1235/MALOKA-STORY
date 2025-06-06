@@ -1,26 +1,52 @@
 
-import React, { useState } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
+import React, { useState, useEffect } from 'react';
 import { Order } from '../../types';
 import { THEME_COLORS } from '../../constants';
 import Button from '../../components/ui/Button';
+import { getAllItems, updateItem, STORES } from '../../database';
 
 const AdminOrdersPage: React.FC = () => {
-  const [orders, setOrders] = useLocalStorage<Order[]>('orders', []);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  const toggleOrderStatus = (orderId: string, currentStatus: Order['status']) => {
-    // Cycle through statuses: Pending -> Processed -> Shipped -> Delivered -> Pending
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setIsLoading(true);
+      try {
+        const dbOrders = await getAllItems<Order>(STORES.ORDERS);
+        setOrders(dbOrders.sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()));
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        setOrders([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
+
+  const toggleOrderStatus = async (orderId: string, currentStatus: Order['status']) => {
     let nextStatus: Order['status'] = 'Pending';
     if (currentStatus === 'Pending') nextStatus = 'Processed';
     else if (currentStatus === 'Processed') nextStatus = 'Shipped';
     else if (currentStatus === 'Shipped') nextStatus = 'Delivered';
     
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId ? { ...order, status: nextStatus } : order
-      )
-    );
+    const orderToUpdate = orders.find(order => order.id === orderId);
+    if (orderToUpdate) {
+      const updatedOrder = { ...orderToUpdate, status: nextStatus };
+      try {
+        await updateItem<Order>(STORES.ORDERS, updatedOrder);
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === orderId ? updatedOrder : order
+          )
+        );
+      } catch (error) {
+        console.error("Error updating order status:", error);
+        // Optionally show an error message to the user
+      }
+    }
   };
   
   const getStatusColor = (status: Order['status']) => {
@@ -33,6 +59,12 @@ const AdminOrdersPage: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+      <h1 className={`text-3xl font-bold ${THEME_COLORS.accentGold} mb-6`}>الطلبات المستلمة</h1>
+      <p className={`${THEME_COLORS.textSecondary}`}>جاري تحميل الطلبات...</p>
+    </div>;
+  }
 
   if (orders.length === 0) {
     return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
@@ -57,7 +89,7 @@ const AdminOrdersPage: React.FC = () => {
             </tr>
           </thead>
           <tbody className={`divide-y divide-purple-800 ${THEME_COLORS.textPrimary}`}>
-            {orders.sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()).map((order) => (
+            {orders.map((order) => (
               <React.Fragment key={order.id}>
               <tr>
                 <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm">{new Date(order.orderDate).toLocaleDateString('ar-EG')}</td>

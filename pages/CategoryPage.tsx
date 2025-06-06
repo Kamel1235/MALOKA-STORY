@@ -2,20 +2,37 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ProductCard from '../components/products/ProductCard';
-import useLocalStorage from '../hooks/useLocalStorage';
 import { Product, ProductCategory } from '../types';
-import { INITIAL_PRODUCTS } from '../data/mockProducts';
 import { THEME_COLORS } from '../constants';
+import { getAllItems, STORES } from '../database';
 
 const CategoryPage: React.FC = () => {
   const { categoryName } = useParams<{ categoryName: string }>();
-  const [products] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [currentCategory, setCurrentCategory] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const fetchProducts = async () => {
+      setIsLoading(true);
+      try {
+        const dbProducts = await getAllItems<Product>(STORES.PRODUCTS);
+        setAllProducts(dbProducts);
+      } catch (error) {
+        console.error("Error fetching products for CategoryPage:", error);
+        setAllProducts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) return; // Wait for products to load
+
     if (categoryName) {
-      // Map URL param to ProductCategory enum values (case-insensitive, simple match)
       const categoryEnumKey = Object.keys(ProductCategory).find(
         key => ProductCategory[key as keyof typeof ProductCategory].toLowerCase() === categoryName.toLowerCase()
       );
@@ -24,14 +41,14 @@ const CategoryPage: React.FC = () => {
 
       if (targetCategory) {
         setCurrentCategory(targetCategory);
-        setFilteredProducts(products.filter(p => p.category === targetCategory));
+        setFilteredProducts(allProducts.filter(p => p.category === targetCategory));
       } else {
-        setCurrentCategory(categoryName); // If not a direct match, maybe a custom category?
-        setFilteredProducts([]); // Or show all, or an error
+        setCurrentCategory(categoryName); 
+        setFilteredProducts([]); 
       }
     }
-     window.scrollTo(0, 0);
-  }, [categoryName, products]);
+    window.scrollTo(0, 0);
+  }, [categoryName, allProducts, isLoading]);
 
   return (
     <div className={`min-h-screen ${THEME_COLORS.background} pb-12 pt-8 bg-gradient-to-b from-indigo-950 via-purple-900 to-indigo-950`}>
@@ -43,7 +60,9 @@ const CategoryPage: React.FC = () => {
           <p className={`${THEME_COLORS.textSecondary} text-center text-lg mb-10`}>
             تصفح أحدث المنتجات في فئة {currentCategory || "مختارة"}.
           </p>
-          {filteredProducts.length > 0 ? (
+          {isLoading ? (
+            <p className="text-center text-xl text-gray-400">جاري تحميل المنتجات...</p>
+          ) : filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {filteredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />

@@ -6,7 +6,7 @@ export const THEME_COLORS = {
   cardBackground: 'bg-purple-900',
   accentGold: 'text-amber-400', // #f59e0b
   accentGoldDarker: 'text-amber-500', // #D4AF37 is closer to amber-500/600
-  buttonGold: 'bg-amber-500', // Using Tailwind's amber
+  buttonGold: 'bg-amber-500', 
   buttonGoldHover: 'bg-amber-600',
   textPrimary: 'text-white',
   textSecondary: 'text-gray-300',
@@ -15,13 +15,13 @@ export const THEME_COLORS = {
   inputBackground: 'bg-purple-800',
 };
 
-export const ADMIN_PASSWORD = 'Kamel01112024743'; // كلمة مرور المدير
+export const ADMIN_PASSWORD = 'Kamel01112024743'; 
 
-export const SITE_NAME = "أناقة الستانلس"; // Consistent Site Name
+export const SITE_NAME = "أناقة الستانلس"; 
 
-export const DEFAULT_SITE_LOGO_URL = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png"; // Default logo
-export const ADMIN_SETTINGS_SITE_LOGO_KEY = 'adminSiteLogoUrl';
-export const ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY = 'adminHeroSliderImages';
+export const DEFAULT_SITE_LOGO_URL = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png";
+// Keys for settings are now managed in database.ts (SETTING_KEYS)
+
 
 export const NAVIGATION_LINKS = [
   { name: "الرئيسية", path: "/", icon: "HomeIcon" },
@@ -40,21 +40,3 @@ export const INITIAL_CONTACT_INFO: ContactInfo = {
   tiktok: '#',
   workingHours: 'السبت - الخميس، 9 صباحًا - 6 مساءً',
 };
-
-// LocalStorage Keys
-export const STORAGE_PRODUCTS_KEY = 'products';
-export const STORAGE_ORDERS_KEY = 'orders';
-export const STORAGE_CONTACT_INFO_KEY = 'contactInformation';
-export const STORAGE_ADMIN_AUTH_KEY = 'isAdminAuthenticated';
-export const STORAGE_GEMINI_API_KEY = 'geminiApiKey';
-
-// Consolidate all managed keys for data import/export
-export const MANAGED_STORAGE_KEYS = [
-  STORAGE_PRODUCTS_KEY,
-  STORAGE_ORDERS_KEY,
-  STORAGE_CONTACT_INFO_KEY,
-  STORAGE_ADMIN_AUTH_KEY,
-  ADMIN_SETTINGS_SITE_LOGO_KEY,
-  ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY,
-  STORAGE_GEMINI_API_KEY,
-];

@@ -1,15 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
 import { 
   THEME_COLORS, 
   DEFAULT_SITE_LOGO_URL, 
-  ADMIN_SETTINGS_SITE_LOGO_KEY, 
-  ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY,
-  STORAGE_GEMINI_API_KEY // Import the new key
 } from '../../constants';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
+import { getSetting, setSetting, SETTING_KEYS } from '../../database';
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -21,10 +18,9 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 const AdminAppearanceSettingsPage: React.FC = () => {
-  const [siteLogoUrl, setSiteLogoUrl] = useLocalStorage<string>(ADMIN_SETTINGS_SITE_LOGO_KEY, DEFAULT_SITE_LOGO_URL);
-  const [heroImages, setHeroImages] = useLocalStorage<string[]>(ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY, []);
-  const [geminiApiKey, setGeminiApiKey] = useLocalStorage<string>(STORAGE_GEMINI_API_KEY, '');
-
+  const [siteLogoUrl, setSiteLogoUrlState] = useState<string>(DEFAULT_SITE_LOGO_URL);
+  const [heroImages, setHeroImagesState] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [newLogoFile, setNewLogoFile] = useState<File | null>(null);
   const [newLogoPreview, setNewLogoPreview] = useState<string | null>(null);
@@ -32,16 +28,30 @@ const AdminAppearanceSettingsPage: React.FC = () => {
   const [newHeroImageFiles, setNewHeroImageFiles] = useState<FileList | null>(null);
   const [newHeroImagePreviews, setNewHeroImagePreviews] = useState<string[]>([]);
 
-  const [apiKeyInput, setApiKeyInput] = useState<string>('');
-  const [showApiKey, setShowApiKey] = useState<boolean>(false);
-
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  useEffect(() => {
+    const fetchAppearanceSettings = async () => {
+      setIsLoading(true);
+      try {
+        const dbLogoUrl = await getSetting<string>(SETTING_KEYS.SITE_LOGO_URL, DEFAULT_SITE_LOGO_URL);
+        setSiteLogoUrlState(dbLogoUrl);
+        const dbHeroImages = await getSetting<string[]>(SETTING_KEYS.HERO_SLIDER_IMAGES, []);
+        setHeroImagesState(dbHeroImages);
+      } catch (error) {
+        console.error("Error fetching appearance settings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAppearanceSettings();
+  }, []);
+  
   useEffect(() => {
     if (newLogoFile) {
       const objectUrl = URL.createObjectURL(newLogoFile);
       setNewLogoPreview(objectUrl);
-      return () => URL.revokeObjectURL(objectUrl); 
+      return () => URL.revokeObjectURL(objectUrl);
     }
     setNewLogoPreview(null);
   }, [newLogoFile]);
@@ -50,22 +60,10 @@ const AdminAppearanceSettingsPage: React.FC = () => {
     if (newHeroImageFiles && newHeroImageFiles.length > 0) {
       const previewUrls = Array.from(newHeroImageFiles).map(file => URL.createObjectURL(file));
       setNewHeroImagePreviews(previewUrls);
-      return () => previewUrls.forEach(url => URL.revokeObjectURL(url)); 
+      return () => previewUrls.forEach(url => URL.revokeObjectURL(url));
     }
     setNewHeroImagePreviews([]);
   }, [newHeroImageFiles]);
-
-  useEffect(() => {
-    // Populate API key input from localStorage on load
-    if (geminiApiKey) {
-      setApiKeyInput(geminiApiKey);
-    }
-  }, [geminiApiKey]);
-
-  const displayFeedback = (type: 'success' | 'error', message: string) => {
-    setFeedback({ type, message });
-    setTimeout(() => setFeedback(null), 4000);
-  };
 
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -85,59 +83,76 @@ const AdminAppearanceSettingsPage: React.FC = () => {
 
   const handleSaveLogo = async () => {
     if (!newLogoFile) {
-      displayFeedback('error', 'يرجى اختيار ملف شعار أولاً.');
+      setFeedback({ type: 'error', message: 'يرجى اختيار ملف شعار أولاً.' });
       return;
     }
+    setFeedback(null);
     try {
       const base64Logo = await fileToBase64(newLogoFile);
-      setSiteLogoUrl(base64Logo);
-      setNewLogoFile(null); 
-      displayFeedback('success', 'تم حفظ الشعار بنجاح!');
+      await setSetting<string>(SETTING_KEYS.SITE_LOGO_URL, base64Logo);
+      setSiteLogoUrlState(base64Logo); // Update local state for immediate display
+      setNewLogoFile(null);
+      setFeedback({ type: 'success', message: 'تم حفظ الشعار بنجاح!' });
     } catch (error) {
       console.error("Error saving logo:", error);
-      displayFeedback('error', 'حدث خطأ أثناء حفظ الشعار.');
+      setFeedback({ type: 'error', message: 'حدث خطأ أثناء حفظ الشعار.' });
     }
+    setTimeout(() => setFeedback(null), 4000);
   };
 
   const handleSaveHeroImages = async () => {
     if (!newHeroImageFiles || newHeroImageFiles.length === 0) {
-      displayFeedback('error', 'يرجى اختيار ملف واحد على الأقل لصور السلايدر.');
+      setFeedback({ type: 'error', message: 'يرجى اختيار ملف واحد على الأقل لصور السلايدر.' });
       return;
     }
+    setFeedback(null);
     try {
       const base64Promises = Array.from(newHeroImageFiles).map(file => fileToBase64(file));
       const base64Images = await Promise.all(base64Promises);
-      setHeroImages(base64Images);
-      setNewHeroImageFiles(null); 
-      displayFeedback('success', 'تم حفظ صور السلايدر بنجاح!');
+      await setSetting<string[]>(SETTING_KEYS.HERO_SLIDER_IMAGES, base64Images);
+      setHeroImagesState(base64Images); // Update local state
+      setNewHeroImageFiles(null);
+      setFeedback({ type: 'success', message: 'تم حفظ صور السلايدر بنجاح!' });
     } catch (error) {
       console.error("Error saving hero images:", error);
-      displayFeedback('error', 'حدث خطأ أثناء حفظ صور السلايدر.');
+      setFeedback({ type: 'error', message: 'حدث خطأ أثناء حفظ صور السلايدر.' });
     }
+    setTimeout(() => setFeedback(null), 4000);
   };
   
-  const handleRevertToDefaultLogo = () => {
-    setSiteLogoUrl(DEFAULT_SITE_LOGO_URL);
-    setNewLogoFile(null);
-    displayFeedback('success', 'تم استعادة الشعار الافتراضي.');
-  };
-
-  const handleRevertToDefaultHeroImages = () => {
-    setHeroImages([]); 
-    setNewHeroImageFiles(null);
-    displayFeedback('success', 'تم استعادة صور السلايدر الافتراضية (المستمدة من المنتجات).');
-  };
-
-  const handleSaveApiKey = () => {
-    if (!apiKeyInput.trim()) {
-        displayFeedback('error', 'يرجى إدخال مفتاح Gemini API.');
-        return;
+  const handleRevertToDefaultLogo = async () => {
+    setFeedback(null);
+    try {
+        await setSetting<string>(SETTING_KEYS.SITE_LOGO_URL, DEFAULT_SITE_LOGO_URL);
+        setSiteLogoUrlState(DEFAULT_SITE_LOGO_URL);
+        setNewLogoFile(null);
+        setFeedback({ type: 'success', message: 'تم استعادة الشعار الافتراضي.' });
+    } catch (error) {
+        console.error("Error reverting logo:", error);
+        setFeedback({ type: 'error', message: 'حدث خطأ أثناء استعادة الشعار الافتراضي.' });
     }
-    setGeminiApiKey(apiKeyInput.trim());
-    displayFeedback('success', 'تم حفظ مفتاح Gemini API بنجاح! قد تحتاج إلى تحديث الصفحة لتفعيل التغييرات فوراً.');
-    // Optionally, trigger a re-initialization of the AI service or inform the user to refresh
-    // For simplicity, current AI util will pick up on next load or if re-imported.
+    setTimeout(() => setFeedback(null), 3000);
   };
+
+  const handleRevertToDefaultHeroImages = async () => {
+    setFeedback(null);
+    try {
+        await setSetting<string[]>(SETTING_KEYS.HERO_SLIDER_IMAGES, []);
+        setHeroImagesState([]);
+        setNewHeroImageFiles(null);
+        setFeedback({ type: 'success', message: 'تم استعادة صور السلايدر الافتراضية (المستمدة من المنتجات).' });
+    } catch (error) {
+        console.error("Error reverting hero images:", error);
+        setFeedback({ type: 'error', message: 'حدث خطأ أثناء استعادة صور السلايدر الافتراضية.' });
+    }
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
+  if (isLoading) {
+    return <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl text-center ${THEME_COLORS.textSecondary}`}>
+        جاري تحميل إعدادات المظهر...
+    </div>;
+  }
 
   return (
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl space-y-10`}>
@@ -149,7 +164,6 @@ const AdminAppearanceSettingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Site Logo Section */}
       <section className={`p-6 border ${THEME_COLORS.borderColor} rounded-lg`}>
         <h2 className={`text-2xl font-semibold ${THEME_COLORS.accentGoldDarker} mb-6`}>شعار الموقع</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -184,7 +198,6 @@ const AdminAppearanceSettingsPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Hero Slider Images Section */}
       <section className={`p-6 border ${THEME_COLORS.borderColor} rounded-lg`}>
         <h2 className={`text-2xl font-semibold ${THEME_COLORS.accentGoldDarker} mb-6`}>صور السلايدر الرئيسي</h2>
         <div>
@@ -224,46 +237,6 @@ const AdminAppearanceSettingsPage: React.FC = () => {
           </div>
         </div>
       </section>
-
-       {/* Gemini API Key Section */}
-      <section className={`p-6 border ${THEME_COLORS.borderColor} rounded-lg`}>
-        <h2 className={`text-2xl font-semibold ${THEME_COLORS.accentGoldDarker} mb-4`}>إعدادات مفتاح Gemini API</h2>
-        <p className={`${THEME_COLORS.textSecondary} text-sm mb-4`}>
-            هذا المفتاح ضروري لتشغيل ميزات الذكاء الاصطناعي مثل اقتراح وصف المنتجات والنصائح. يمكنك الحصول عليه من Google AI Studio.
-        </p>
-        <div className="space-y-3">
-            <div className="relative">
-                <Input
-                    label="مفتاح Gemini API"
-                    id="geminiApiKeyInput"
-                    type={showApiKey ? "text" : "password"}
-                    value={apiKeyInput}
-                    onChange={(e) => setApiKeyInput(e.target.value)}
-                    placeholder="أدخل مفتاح Gemini API هنا"
-                    className="pr-10"
-                />
-                <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className={`absolute left-2 top-9 p-1 ${THEME_COLORS.textSecondary} hover:${THEME_COLORS.accentGold}`}
-                    aria-label={showApiKey ? "إخفاء المفتاح" : "إظهار المفتاح"}
-                >
-                    {showApiKey ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" />
-                        </svg>
-                    ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                    )}
-                </button>
-            </div>
-            <Button onClick={handleSaveApiKey}>حفظ مفتاح API</Button>
-        </div>
-      </section>
-
     </div>
   );
 };

@@ -1,26 +1,25 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import useLocalStorage from '../hooks/useLocalStorage';
 import { Product, Order, OrderItem } from '../types';
-import { INITIAL_PRODUCTS } from '../data/mockProducts';
 import ImageSlider from '../components/products/ImageSlider';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import OrderForm from '../components/products/OrderForm';
 import { THEME_COLORS } from '../constants';
 import ProductCard from '../components/products/ProductCard';
-import { getStylingTips } from '../utils/geminiApi'; // Import Gemini API util
+import { getStylingTips } from '../utils/geminiApi';
+import { getAllItems, getItemById, addItem, STORES } from '../database';
 
 const ProductDetailPage: React.FC = () => {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const [products] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
-  const [orders, setOrders] = useLocalStorage<Order[]>('orders', []);
   
   const [product, setProduct] = useState<Product | undefined>(undefined);
-  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(true);
+  
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [orderFeedback, setOrderFeedback] = useState<{type: 'success' | 'error', message: string, image?: string} | null>(null);
 
   const [isFetchingTips, setIsFetchingTips] = useState(false);
@@ -28,22 +27,42 @@ const ProductDetailPage: React.FC = () => {
   const [stylingTipsError, setStylingTipsError] = useState<string | null>(null);
 
   useEffect(() => {
-    const foundProduct = products.find(p => p.id === productId);
-    if (foundProduct) {
-      setProduct(foundProduct);
-      const related = products.filter(p => p.category === foundProduct.category && p.id !== foundProduct.id).slice(0, 3);
-      setRelatedProducts(related);
-      // Reset tips when product changes
+    const fetchProductData = async () => {
+      if (!productId) {
+        setIsLoadingProduct(false);
+        navigate('/'); // Or to a 404 page
+        return;
+      }
+
+      setIsLoadingProduct(true);
+      setProduct(undefined); // Clear previous product
+      setRelatedProducts([]);
       setStylingTips(null);
       setStylingTipsError(null);
-      setIsFetchingTips(false);
-    } else {
-      // navigate('/'); // Optional: navigate to a 404 page or home
-    }
-    window.scrollTo(0, 0);
-  }, [productId, products, navigate]);
 
-  const handleOrderSubmit = (orderDetails: Omit<Order, 'id' | 'orderDate' | 'status' | 'totalAmount' | 'items'> & { productId: string; quantity: number }) => {
+      try {
+        const foundProduct = await getItemById<Product>(STORES.PRODUCTS, productId);
+        if (foundProduct) {
+          setProduct(foundProduct);
+          const allProducts = await getAllItems<Product>(STORES.PRODUCTS);
+          const related = allProducts.filter(p => p.category === foundProduct.category && p.id !== foundProduct.id).slice(0, 3);
+          setRelatedProducts(related);
+        } else {
+           // navigate('/'); // Optional: navigate to a 404 page or home
+           console.warn(`Product with ID ${productId} not found.`);
+        }
+      } catch (error) {
+        console.error("Error fetching product details:", error);
+      } finally {
+        setIsLoadingProduct(false);
+        window.scrollTo(0, 0);
+      }
+    };
+
+    fetchProductData();
+  }, [productId, navigate]);
+
+  const handleOrderSubmit = async (orderDetails: Omit<Order, 'id' | 'orderDate' | 'status' | 'totalAmount' | 'items'> & { productId: string; quantity: number }) => {
     setOrderFeedback(null); 
 
     if (!product) {
@@ -57,7 +76,7 @@ const ProductDetailPage: React.FC = () => {
         productName: product.name,
         quantity: orderDetails.quantity,
         price: product.price,
-        productImage: product.images[0] || 'https://via.placeholder.com/100?text=No+Image', // Save product image
+        productImage: product.images[0] || 'https://via.placeholder.com/100?text=No+Image',
       };
 
       const newOrder: Order = {
@@ -71,7 +90,7 @@ const ProductDetailPage: React.FC = () => {
         status: 'Pending',
       };
 
-      setOrders(prevOrders => [...prevOrders, newOrder]);
+      await addItem<Order>(STORES.ORDERS, newOrder);
       setIsOrderModalOpen(false); 
       setOrderFeedback({ 
         type: 'success', 
@@ -102,8 +121,12 @@ const ProductDetailPage: React.FC = () => {
     }
   };
 
+  if (isLoadingProduct) {
+    return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>جاري تحميل المنتج...</div>;
+  }
+
   if (!product) {
-    return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>جاري تحميل المنتج... أو المنتج غير موجود.</div>;
+    return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>لم يتم العثور على المنتج المطلوب. قد يكون تم حذفه أو أن الرابط غير صحيح.</div>;
   }
 
   return (
@@ -168,7 +191,6 @@ const ProductDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Styling Tips Section */}
         {stylingTipsError && (
           <div className="mt-6 p-4 rounded-md bg-red-700 text-white text-center shadow">
             {stylingTipsError}
@@ -191,8 +213,8 @@ const ProductDetailPage: React.FC = () => {
             <h2 className={`text-3xl font-bold text-center mb-2 ${THEME_COLORS.accentGold}`}>منتجات مشابهة قد تعجبك</h2>
             <p className={`${THEME_COLORS.textSecondary} text-center text-lg mb-10`}>إكسسوارات تانية ممكن تكمل أناقتك.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {relatedProducts.map((relatedProduct) => (
-                <ProductCard key={relatedProduct.id} product={relatedProduct} />
+              {relatedProducts.map((relatedProd) => ( // Renamed to avoid conflict
+                <ProductCard key={relatedProd.id} product={relatedProd} />
               ))}
             </div>
           </section>

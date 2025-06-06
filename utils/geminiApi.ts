@@ -1,36 +1,17 @@
 
 import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
 import { ProductCategory, Product } from '../types';
-import { STORAGE_GEMINI_API_KEY } from '../constants';
 
-let effectiveApiKey: string | null = null;
-const apiKeyMissingErrorMsg = "مفتاح Gemini API غير مُعد أو غير صالح. يرجى إضافته من خلال لوحة التحكم (إعدادات المظهر > إعدادات مفتاح Gemini API).";
+// IMPORTANT: This uses process.env.API_KEY as per strict guidelines.
+// Ensure API_KEY is set in your execution environment.
+const API_KEY = process.env.API_KEY;
 
-try {
-  const storedApiKeyItem = localStorage.getItem(STORAGE_GEMINI_API_KEY);
-  if (storedApiKeyItem) {
-    // useLocalStorage stores string values JSON-encoded, so we need to parse it.
-    const parsedKey = JSON.parse(storedApiKeyItem); 
-    if (typeof parsedKey === 'string' && parsedKey.trim() !== '') {
-      effectiveApiKey = parsedKey;
-    }
-  }
-} catch (error) {
-  console.error(`Error reading ${STORAGE_GEMINI_API_KEY} from localStorage:`, error);
+if (!API_KEY) {
+  console.warn("API_KEY for Gemini is not set in environment variables. AI features will not work.");
 }
 
-const ai = effectiveApiKey ? new GoogleGenAI({ apiKey: effectiveApiKey }) : null;
-
-if (!ai && effectiveApiKey !== null) { // Log warning only if an attempt to set key was made but failed, or if it was never set
-    if(!localStorage.getItem(STORAGE_GEMINI_API_KEY)) {
-        console.warn(apiKeyMissingErrorMsg + " (المفتاح غير موجود في التخزين المحلي)");
-    } else {
-        console.warn(apiKeyMissingErrorMsg + " (قد يكون المفتاح المخزن غير صالح أو حدث خطأ أثناء التهيئة)");
-    }
-} else if (!ai && effectiveApiKey === null) {
-     console.info("Gemini API key not yet configured by user. AI features will be disabled until set in Admin Panel.");
-}
-
+const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
+const modelName = 'gemini-2.5-flash-preview-04-17'; // This model supports multimodal input
 
 export interface ImageInput {
   mimeType: string;
@@ -44,7 +25,7 @@ export const generateProductDescription = async (
   imageInput: ImageInput | null = null
 ): Promise<string> => {
   if (!ai) {
-    return Promise.reject(apiKeyMissingErrorMsg);
+    return Promise.reject("Gemini API client is not initialized. Check API_KEY.");
   }
 
   const parts: Part[] = [];
@@ -76,7 +57,7 @@ ${existingNotes ? `ملاحظات إضافية أو كلمات مفتاحية أ
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-04-17',
+        model: modelName,
         contents: { parts }, 
     });
     return response.text.trim();
@@ -95,7 +76,7 @@ export const getStylingTips = async (
   productDescription: string
 ): Promise<string> => {
   if (!ai) {
-    return Promise.reject(apiKeyMissingErrorMsg);
+    return Promise.reject("Gemini API client is not initialized. Check API_KEY.");
   }
   const prompt = `أنت خبير تنسيق أزياء (ستايلست) لمتجر إكسسوارات من الستانلس ستيل اسمه 'Maloka Story'.
 المنتج الحالي:
@@ -107,7 +88,7 @@ export const getStylingTips = async (
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-04-17',
+        model: modelName,
         contents: prompt,
     });
     return response.text.trim();
@@ -136,7 +117,7 @@ export interface GiftSuggestion {
 
 export const suggestGifts = async (input: GiftSuggestionInput): Promise<GiftSuggestion[] | string> => {
   if (!ai) {
-    return Promise.reject(apiKeyMissingErrorMsg);
+    return Promise.reject("Gemini API client is not initialized. Check API_KEY.");
   }
 
   const productListText = input.availableProducts.map(
@@ -170,15 +151,16 @@ ${productListText}
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: modelName,
       contents: prompt,
       config: { temperature: 0.7 } 
     });
 
     const textResponse = response.text.trim();
 
+    // Check for "no match" message
     if (textResponse.includes("لم أجد منتجًا يطابق") || textResponse.includes("لا يوجد منتج مناسب")) {
-      return textResponse; 
+      return textResponse; // Return the "no match" message as a string
     }
     
     const suggestions: GiftSuggestion[] = [];
@@ -191,6 +173,7 @@ ${productListText}
       if (nameMatch && nameMatch[1] && reasonMatch && reasonMatch[1]) {
         const productName = nameMatch[1].trim();
         const reason = reasonMatch[1].trim();
+        // Find the product ID from the available products list
         const matchedProduct = input.availableProducts.find(p => p.name.trim().toLowerCase() === productName.toLowerCase());
         suggestions.push({ 
           productName, 
@@ -201,6 +184,8 @@ ${productListText}
     }
     
     if (suggestions.length === 0 && !textResponse.startsWith("لم أجد منتجًا يطابق")) {
+        // This case handles if the API returns something unexpected that isn't a "no match" message
+        // and isn't parsable into suggestions.
         console.warn("Gemini response for gift suggestion was not in expected format:", textResponse);
         return "لم أتمكن من فهم اقتراحات الهدايا. الرجاء المحاولة مرة أخرى أو تعديل بحثك.";
     }
