@@ -1,16 +1,14 @@
-
 import React, { useState } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
 import { Order } from '../../types';
 import { THEME_COLORS } from '../../constants';
 import Button from '../../components/ui/Button';
+import { useData } from '../../contexts/DataContext'; // Import useData
 
 const AdminOrdersPage: React.FC = () => {
-  const [orders, setOrders] = useLocalStorage<Order[]>('orders', []);
+  const { orders, setOrders } = useData(); // Use orders and setOrders from DataContext
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   const toggleOrderStatus = (orderId: string, currentStatus: Order['status']) => {
-    // Cycle through statuses: Pending -> Processed -> Shipped -> Delivered -> Pending
     let nextStatus: Order['status'] = 'Pending';
     if (currentStatus === 'Pending') nextStatus = 'Processed';
     else if (currentStatus === 'Processed') nextStatus = 'Shipped';

@@ -1,15 +1,13 @@
-
 import React, { useState } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
 import { Product, ProductCategory } from '../../types';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import { THEME_COLORS } from '../../constants';
 import { useNavigate } from 'react-router-dom';
-import { generateProductDescription, ImageInput } from '../../utils/geminiApi'; // Import Gemini API util and ImageInput
+import { generateProductDescription, ImageInput } from '../../utils/geminiApi';
+import { useData } from '../../contexts/DataContext'; // Import useData
 
-// Helper to convert file to base64 and get mimeType
 const fileToImageInput = (file: File): Promise<ImageInput> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -20,7 +18,6 @@ const fileToImageInput = (file: File): Promise<ImageInput> => {
       if (match && match[1] && match[2]) {
         resolve({ mimeType: match[1], data: match[2] });
       } else {
-        // Fallback for safety, though readAsDataURL should produce this format
         resolve({ mimeType: file.type || 'application/octet-stream', data: dataUrl.split(',')[1] });
       }
     };
@@ -30,7 +27,7 @@ const fileToImageInput = (file: File): Promise<ImageInput> => {
 
 
 const AdminAddProductPage: React.FC = () => {
-  const [products, setProducts] = useLocalStorage<Product[]>('products', []);
+  const { setProducts } = useData(); // Use setProducts from DataContext
   const navigate = useNavigate();
 
   const initialFormState: Omit<Product, 'id' | 'images'> = {
@@ -43,6 +40,7 @@ const AdminAddProductPage: React.FC = () => {
   const [newProduct, setNewProduct] = useState<Omit<Product, 'id' | 'images'>>(initialFormState);
   const [selectedImageFiles, setSelectedImageFiles] = useState<FileList | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [descGenerationError, setDescGenerationError] = useState<string | null>(null);
 
@@ -86,8 +84,8 @@ const AdminAddProductPage: React.FC = () => {
       const description = await generateProductDescription(
         newProduct.name, 
         newProduct.category, 
-        newProduct.description, // Pass current description as notes
-        imageInput // Pass the image data
+        newProduct.description, 
+        imageInput
       );
       setNewProduct(prev => ({ ...prev, description }));
     } catch (error: any) {
@@ -100,6 +98,7 @@ const AdminAddProductPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    setFeedback(null);
 
     if (!newProduct.name || newProduct.price <= 0 || !selectedImageFiles || selectedImageFiles.length === 0) {
         setFormError("يرجى ملء الاسم، السعر، واختيار صورة واحدة على الأقل للمنتج.");
@@ -107,7 +106,6 @@ const AdminAddProductPage: React.FC = () => {
     }
 
     try {
-      // Convert all selected files to base64 data URLs for storage
       const imagePromises = Array.from(selectedImageFiles).map(file => {
         return new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -128,12 +126,10 @@ const AdminAddProductPage: React.FC = () => {
       setNewProduct(initialFormState); 
       setSelectedImageFiles(null); 
       const fileInput = document.getElementById('imageFiles') as HTMLInputElement;
-      if (fileInput) {
-        fileInput.value = '';
-      }
+      if (fileInput) fileInput.value = '';
 
-      alert('تمت إضافة المنتج بنجاح!');
-      navigate('/admin/dashboard/products');
+      setFeedback(`تمت إضافة المنتج "${productToAdd.name}" بنجاح إلى جلسة العمل الحالية. اذهب إلى "نشر التغييرات" لجعله دائماً.`);
+      // navigate('/admin/dashboard/products'); // Don't navigate immediately, let admin publish
 
     } catch (error) {
       console.error("Error processing images for saving:", error);
@@ -145,6 +141,8 @@ const AdminAddProductPage: React.FC = () => {
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl`}>
       <h1 className={`text-3xl font-bold ${THEME_COLORS.accentGold} mb-8`}>إضافة منتج جديد</h1>
       {formError && <p className="text-red-400 bg-red-900/30 p-3 rounded-md mb-4">{formError}</p>}
+      {feedback && <p className="text-green-400 bg-green-900/30 p-3 rounded-md mb-4">{feedback}</p>}
+      
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input 
           label="اسم المنتج" 
@@ -219,14 +217,14 @@ const AdminAddProductPage: React.FC = () => {
             onChange={handleChange}
             className={`w-full px-3 py-2 ${THEME_COLORS.inputBackground} ${THEME_COLORS.textPrimary} border ${THEME_COLORS.borderColor} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:${THEME_COLORS.borderColorGold} sm:text-sm`}
           >
-            {Object.values(ProductCategory).map(cat => (
+            {Object.values(ProductCategory).map((cat: string) => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
         </div>
        
         <Button type="submit" variant="primary" size="lg" className="w-full">
-          إضافة المنتج
+          إضافة المنتج للجلسة الحالية
         </Button>
       </form>
     </div>

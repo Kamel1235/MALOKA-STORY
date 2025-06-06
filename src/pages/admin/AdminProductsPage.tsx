@@ -1,16 +1,13 @@
-
-import React, { useState } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
+import React, { useState, useEffect } from 'react';
 import { Product, ProductCategory } from '../../types';
-import { INITIAL_PRODUCTS } from '../../data/mockProducts';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import Modal from '../../components/ui/Modal';
 import { THEME_COLORS } from '../../constants';
-import { generateProductDescription, ImageInput } from '../../utils/geminiApi'; // Import Gemini API util and ImageInput
+import { generateProductDescription, ImageInput } from '../../utils/geminiApi';
+import { useData } from '../../contexts/DataContext'; // Import useData
 
-// Helper to convert file to base64 and get mimeType
 const fileToImageInputOnEdit = (file: File): Promise<ImageInput> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -28,9 +25,8 @@ const fileToImageInputOnEdit = (file: File): Promise<ImageInput> => {
   });
 };
 
-// Helper to extract base64 and mimeType from existing Data URL
 const extractImageDataFromDataUrl = (dataUrl: string): ImageInput | null => {
-  const match = dataUrl.match(/^data:(image\/\w+);base64,(.*)$/); // Specifically for images
+  const match = dataUrl.match(/^data:(image\/\w+);base64,(.*)$/);
   if (match && match[1] && match[2]) {
     return { mimeType: match[1], data: match[2] };
   }
@@ -38,17 +34,19 @@ const extractImageDataFromDataUrl = (dataUrl: string): ImageInput | null => {
 }
 
 const AdminProductsPage: React.FC = () => {
-  const [products, setProducts] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
+  const { products, setProducts, isLoading } = useData(); // Use products and setProducts from DataContext
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  const [currentProductForEdit, setCurrentProductForEdit] = useState<Product | null>(null); // Renamed to avoid conflict
   const [searchTerm, setSearchTerm] = useState('');
   const [editingImageFiles, setEditingImageFiles] = useState<FileList | null>(null);
   
   const [isGeneratingDescInModal, setIsGeneratingDescInModal] = useState(false);
   const [descGenerationErrorInModal, setDescGenerationErrorInModal] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
 
   const openEditModal = (product: Product) => {
-    setCurrentProduct(JSON.parse(JSON.stringify(product))); 
+    setCurrentProductForEdit(JSON.parse(JSON.stringify(product))); 
     setEditingImageFiles(null); 
     setDescGenerationErrorInModal(null); 
     setIsGeneratingDescInModal(false);
@@ -57,22 +55,22 @@ const AdminProductsPage: React.FC = () => {
 
   const closeEditModal = () => {
     setIsEditModalOpen(false);
-    setCurrentProduct(null);
+    setCurrentProductForEdit(null);
     setEditingImageFiles(null);
     setDescGenerationErrorInModal(null);
     setIsGeneratingDescInModal(false);
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    if (!currentProduct) return;
+    if (!currentProductForEdit) return;
     const { name, value } = e.target;
 
     if (name === "images") return; 
 
     if (name === "price") {
-        setCurrentProduct({ ...currentProduct, [name]: parseFloat(value) });
+        setCurrentProductForEdit({ ...currentProductForEdit, [name]: parseFloat(value) });
     } else {
-        setCurrentProduct({ ...currentProduct, [name]: value });
+        setCurrentProductForEdit({ ...currentProductForEdit, [name]: value });
     }
     if (name === 'description' && descGenerationErrorInModal) {
       setDescGenerationErrorInModal(null); 
@@ -80,7 +78,7 @@ const AdminProductsPage: React.FC = () => {
   };
 
   const handleSuggestDescriptionInModal = async () => {
-    if (!currentProduct || !currentProduct.name || !currentProduct.category) {
+    if (!currentProductForEdit || !currentProductForEdit.name || !currentProductForEdit.category) {
       setDescGenerationErrorInModal("اسم المنتج والفئة مطلوبان لاقتراح وصف.");
       return;
     }
@@ -98,21 +96,18 @@ const AdminProductsPage: React.FC = () => {
             setIsGeneratingDescInModal(false);
             return;
         }
-    } else if (currentProduct.images && currentProduct.images.length > 0) {
-        imageInput = extractImageDataFromDataUrl(currentProduct.images[0]);
-        if (!imageInput) {
-            console.warn("Could not extract base64 from existing image URL:", currentProduct.images[0]);
-        }
+    } else if (currentProductForEdit.images && currentProductForEdit.images.length > 0) {
+        imageInput = extractImageDataFromDataUrl(currentProductForEdit.images[0]);
     }
 
     try {
       const description = await generateProductDescription(
-        currentProduct.name, 
-        currentProduct.category, 
-        currentProduct.description, 
+        currentProductForEdit.name, 
+        currentProductForEdit.category, 
+        currentProductForEdit.description, 
         imageInput 
       );
-      setCurrentProduct(prev => prev ? { ...prev, description } : null);
+      setCurrentProductForEdit(prev => prev ? { ...prev, description } : null);
     } catch (error: any) {
       setDescGenerationErrorInModal(error.message || "حدث خطأ أثناء إنشاء الوصف.");
     } finally {
@@ -121,9 +116,9 @@ const AdminProductsPage: React.FC = () => {
   };
 
   const handleSaveProduct = async () => {
-    if (!currentProduct) return;
+    if (!currentProductForEdit) return;
 
-    let productToSave = { ...currentProduct };
+    let productToSave = { ...currentProductForEdit };
 
     if (editingImageFiles && editingImageFiles.length > 0) {
       try {
@@ -139,7 +134,8 @@ const AdminProductsPage: React.FC = () => {
         productToSave.images = base64Images;
       } catch (error) {
         console.error("Error converting images to Base64 for edit:", error);
-        alert("حدث خطأ أثناء تحديث الصور. يرجى المحاولة مرة أخرى.");
+        setFeedback("حدث خطأ أثناء تحديث الصور. لم يتم حفظ التغييرات.");
+        setTimeout(() => setFeedback(null), 3000);
         return; 
       }
     }
@@ -147,28 +143,17 @@ const AdminProductsPage: React.FC = () => {
     setProducts(prevProducts => 
       prevProducts.map(p => p.id === productToSave.id ? productToSave : p)
     );
+    setFeedback(`تم تحديث المنتج "${productToSave.name}" بنجاح في جلسة العمل الحالية. لا تنسَ "نشر التغييرات" لتصبح دائمة.`);
+    setTimeout(() => setFeedback(null), 5000);
     closeEditModal();
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    // TEMPORARILY REMOVED window.confirm FOR DIRECT TESTING
-    console.log(`[AdminProductsPage] handleDeleteProduct called for ID: ${productId}. Bypassing confirm for test.`);
-    alert(`TEST: Attempting to delete product ID: ${productId}. Check console.`); // For immediate feedback
-
-    setProducts(prevProducts => {
-      console.log(`[AdminProductsPage] Current products before filtering (ID: ${productId}):`, JSON.parse(JSON.stringify(prevProducts)));
-      const updatedProducts = prevProducts.filter(p => p.id !== productId);
-      console.log(`[AdminProductsPage] Products after filtering (ID: ${productId}):`, JSON.parse(JSON.stringify(updatedProducts)));
-      if (prevProducts.length === updatedProducts.length) {
-        console.warn(`[AdminProductsPage] Product with ID ${productId} was not found or filter failed.`);
-      }
-      return updatedProducts;
-    });
-    console.log(`[AdminProductsPage] setProducts call completed for product ID: ${productId}. Check UI and localStorage.`);
-    // You can re-add window.confirm later:
-    // if (window.confirm('هل أنت متأكد أنك تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.')) {
-    //   setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-    // }
+  const handleDeleteProduct = (productId: string, productName: string) => {
+    if (window.confirm(`هل أنت متأكد أنك تريد حذف المنتج "${productName}"؟ هذا الإجراء سيقوم بإزالته من جلسة العمل الحالية. ستحتاج إلى "نشر التغييرات" لجعل الحذف دائماً.`)) {
+      setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+      setFeedback(`تم حذف المنتج "${productName}" من جلسة العمل الحالية. لا تنسَ "نشر التغييرات".`);
+      setTimeout(() => setFeedback(null), 5000);
+    }
   };
   
   const filteredProducts = products.filter(product => 
@@ -176,9 +161,15 @@ const AdminProductsPage: React.FC = () => {
     product.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (isLoading && !products.length) {
+    return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+      <p className={`${THEME_COLORS.textSecondary}`}>جاري تحميل المنتجات...</p>
+    </div>;
+  }
+
   return (
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl`}>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className={`text-2xl sm:text-3xl font-bold ${THEME_COLORS.accentGold}`}>إدارة المنتجات ({filteredProducts.length})</h1>
         <Input 
             type="text" 
@@ -189,8 +180,14 @@ const AdminProductsPage: React.FC = () => {
         />
       </div>
       
-      {filteredProducts.length === 0 ? (
-        <p className={`${THEME_COLORS.textSecondary}`}>لا توجد منتجات تطابق بحثك أو لم يتم إضافة منتجات بعد.</p>
+      {feedback && (
+        <div className="mb-4 p-3 rounded-md bg-green-600 text-white text-center transition-opacity duration-300">
+          {feedback}
+        </div>
+      )}
+
+      {filteredProducts.length === 0 && !isLoading ? (
+        <p className={`${THEME_COLORS.textSecondary} text-center py-4`}>لا توجد منتجات تطابق بحثك أو لم يتم إضافة منتجات بعد.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-purple-700">
@@ -222,10 +219,7 @@ const AdminProductsPage: React.FC = () => {
                     <Button 
                         size="sm" 
                         variant="danger" 
-                        onClick={() => {
-                            console.log(`[AdminProductsPage] Delete button clicked for product ID: ${product.id}`);
-                            handleDeleteProduct(product.id);
-                        }}
+                        onClick={() => handleDeleteProduct(product.id, product.name)}
                         className="w-full sm:w-auto"
                     >
                         حذف
@@ -238,15 +232,15 @@ const AdminProductsPage: React.FC = () => {
         </div>
       )}
 
-      {currentProduct && (
+      {currentProductForEdit && (
         <Modal isOpen={isEditModalOpen} onClose={closeEditModal} title="تعديل المنتج">
           <form onSubmit={(e) => {e.preventDefault(); handleSaveProduct();}} className="space-y-4">
-            <Input label="اسم المنتج" name="name" value={currentProduct.name} onChange={handleEditChange} />
+            <Input label="اسم المنتج" name="name" value={currentProductForEdit.name} onChange={handleEditChange} />
              <div>
                 <label className={`block text-sm font-medium ${THEME_COLORS.textSecondary} mb-1`}>الصور الحالية:</label>
-                {currentProduct.images.length > 0 ? (
+                {currentProductForEdit.images.length > 0 ? (
                     <div className="flex flex-wrap gap-2 mt-1 mb-3 p-2 border border-purple-700 rounded-md bg-purple-800/30">
-                    {currentProduct.images.map((img, index) => (
+                    {currentProductForEdit.images.map((img, index) => (
                         <img 
                           key={index} 
                           src={img} 
@@ -283,7 +277,7 @@ const AdminProductsPage: React.FC = () => {
                     <Button 
                         type="button" 
                         onClick={handleSuggestDescriptionInModal} 
-                        disabled={isGeneratingDescInModal || !currentProduct.name || !currentProduct.category}
+                        disabled={isGeneratingDescInModal || !currentProductForEdit.name || !currentProductForEdit.category}
                         size="sm"
                         variant="ghost"
                         className="text-xs"
@@ -295,30 +289,30 @@ const AdminProductsPage: React.FC = () => {
                 <Textarea 
                     id="modal_description"
                     name="description" 
-                    value={currentProduct.description} 
+                    value={currentProductForEdit.description} 
                     onChange={handleEditChange}
                     rows={3} 
                 />
                 {descGenerationErrorInModal && <p className="mt-1 text-xs text-red-400">{descGenerationErrorInModal}</p>}
             </div>
 
-            <Input label="السعر" name="price" type="number" value={currentProduct.price} onChange={handleEditChange} min="0.01" step="0.01"/>
+            <Input label="السعر" name="price" type="number" value={currentProductForEdit.price} onChange={handleEditChange} min="0.01" step="0.01"/>
             <div>
               <label htmlFor="category" className={`block text-sm font-medium ${THEME_COLORS.textSecondary} mb-1`}>الفئة</label>
               <select 
                 id="category" 
                 name="category" 
-                value={currentProduct.category} 
+                value={currentProductForEdit.category} 
                 onChange={handleEditChange}
                 className={`w-full px-3 py-2 ${THEME_COLORS.inputBackground} ${THEME_COLORS.textPrimary} border ${THEME_COLORS.borderColor} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:${THEME_COLORS.borderColorGold} sm:text-sm`}
               >
-                {Object.values(ProductCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                {Object.values(ProductCategory).map((cat: string) => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </div>
             
             <div className="flex justify-end space-x-3 space-x-reverse pt-4">
               <Button type="button" variant="ghost" onClick={closeEditModal}>إلغاء</Button>
-              <Button type="submit" variant="primary">حفظ التعديلات</Button>
+              <Button type="submit" variant="primary">حفظ التعديلات للجلسة</Button>
             </div>
           </form>
         </Modal>

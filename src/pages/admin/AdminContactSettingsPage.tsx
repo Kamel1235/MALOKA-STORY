@@ -1,21 +1,27 @@
-
 import React, { useState, useEffect } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
 import { ContactInfo } from '../../types';
-import { INITIAL_CONTACT_INFO, THEME_COLORS } from '../../constants';
+import { THEME_COLORS } from '../../constants';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Textarea from '../../components/ui/Textarea';
+import { useData } from '../../contexts/DataContext'; // Import useData
 
 const AdminContactSettingsPage: React.FC = () => {
-  const [contactInfo, setContactInfo] = useLocalStorage<ContactInfo>('contactInformation', INITIAL_CONTACT_INFO);
-  const [formData, setFormData] = useState<ContactInfo>(contactInfo);
+  const { settings, setSettings, isLoading } = useData(); // Use settings from DataContext
+  
+  // Initialize formData with default structure if settings are null/loading
+  const initialFormData: ContactInfo = {
+    phone: '', email: '', facebook: '', instagram: '', tiktok: '', workingHours: ''
+  };
+  const [formData, setFormData] = useState<ContactInfo>(settings?.contactInfo || initialFormData);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    // Update form data if local storage changes (e.g., from another tab or initial load)
-    setFormData(contactInfo);
-  }, [contactInfo]);
+    // Update form data if settings in context change (e.g., initial load completes)
+    if (settings?.contactInfo) {
+      setFormData(settings.contactInfo);
+    }
+  }, [settings]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -24,10 +30,29 @@ const AdminContactSettingsPage: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setContactInfo(formData);
-    setFeedback('تم حفظ التغييرات بنجاح!');
-    setTimeout(() => setFeedback(null), 3000);
+    if (setSettings && settings) {
+      setSettings(prevSettings => {
+        if (!prevSettings) return null; // Should not happen if settings are loaded
+        return { ...prevSettings, contactInfo: formData };
+      });
+      setFeedback('تم تحديث معلومات التواصل في جلسة العمل الحالية. لا تنسَ "نشر التغييرات" لجعلها دائمة.');
+    } else {
+      setFeedback('خطأ: لا يمكن حفظ الإعدادات حالياً.');
+    }
+    setTimeout(() => setFeedback(null), 5000);
   };
+
+  if (isLoading && !settings) {
+    return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+      <p className={`${THEME_COLORS.textSecondary}`}>جاري تحميل إعدادات التواصل...</p>
+    </div>;
+  }
+  
+  if (!settings) {
+     return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+      <p className={`${THEME_COLORS.textSecondary}`}>لم يتم تحميل إعدادات التواصل.</p>
+    </div>;
+  }
 
   return (
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl`}>
@@ -88,7 +113,7 @@ const AdminContactSettingsPage: React.FC = () => {
             placeholder="مثال: السبت - الخميس، 9 صباحًا - 6 مساءً"
         />
         <Button type="submit" variant="primary" size="lg" className="w-full">
-          حفظ التغييرات
+          حفظ التغييرات للجلسة الحالية
         </Button>
       </form>
     </div>

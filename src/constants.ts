@@ -1,5 +1,4 @@
-
-import { ContactInfo } from './types';
+// import { ContactInfo } from './types'; // No longer needed here
 
 export const THEME_COLORS = {
   background: 'bg-indigo-950',
@@ -19,10 +18,8 @@ export const ADMIN_PASSWORD = 'Kamel01112024743'; // كلمة مرور المد�
 
 export const SITE_NAME = "أناقة الستانلس"; // Consistent Site Name
 
-export const DEFAULT_SITE_LOGO_URL = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png"; // Default logo
-export const ADMIN_SETTINGS_SITE_LOGO_KEY = 'adminSiteLogoUrl';
-export const ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY = 'adminHeroSliderImages';
-
+// Default values are now primarily in the settings.json and handled by DataContext if fetch fails
+export const DEFAULT_FALLBACK_SITE_LOGO_URL = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png";
 
 export const NAVIGATION_LINKS = [
   { name: "الرئيسية", path: "/", icon: "HomeIcon" },
@@ -31,9 +28,15 @@ export const NAVIGATION_LINKS = [
   { name: "قلادة", path: "/category/قلادة", icon: "NecklaceIcon" },
   { name: "عروض", path: "/offers", icon: "OfferIcon" },
   { name: "تواصل معانا", path: "/contact", icon: "ContactIcon" },
+  { name: "نشر التغييرات", path: "/admin/dashboard/publish", icon: "PublishIcon" }, // Added for admin
 ];
 
-export const INITIAL_CONTACT_INFO: ContactInfo = {
+// Keys for localStorage (admin auth and orders) remain, but not for site content
+// export const ADMIN_SETTINGS_SITE_LOGO_KEY = 'adminSiteLogoUrl'; // Removed
+// export const ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY = 'adminHeroSliderImages'; // Removed
+
+/*
+export const INITIAL_CONTACT_INFO: ContactInfo = { // Removed, now in settings.json
   phone: '+20 123 456 7890',
   email: 'support@elegance-store.com',
   facebook: '#',
@@ -41,3 +44,4 @@ export const INITIAL_CONTACT_INFO: ContactInfo = {
   tiktok: '#',
   workingHours: 'السبت - الخميس، 9 صباحًا - 6 مساءً',
 };
+*/

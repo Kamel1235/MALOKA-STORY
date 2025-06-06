@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from './ui/Modal';
@@ -11,7 +10,7 @@ import { suggestGifts, GiftSuggestionInput, GiftSuggestion } from '../utils/gemi
 interface GiftAssistantModalProps {
   isOpen: boolean;
   onClose: () => void;
-  availableProducts: Product[];
+  availableProducts: Product[]; // This prop already correctly receives products from DataContext via HomePage
 }
 
 const GiftAssistantModal: React.FC<GiftAssistantModalProps> = ({ isOpen, onClose, availableProducts }) => {
@@ -48,6 +47,7 @@ const GiftAssistantModal: React.FC<GiftAssistantModalProps> = ({ isOpen, onClose
     setSuggestions([]);
     setNoMatchMessage(null);
 
+    // Ensure availableProducts is used correctly when passed to suggestGifts
     const productDataForApi = availableProducts.map(p => ({
       id: p.id,
       name: p.name,
@@ -127,9 +127,10 @@ const GiftAssistantModal: React.FC<GiftAssistantModalProps> = ({ isOpen, onClose
               {budgetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
-          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={isLoading}>
-            {isLoading ? "✨ جاري البحث..." : "ابحث عن الهدية المثالية ✨"}
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={isLoading || availableProducts.length === 0}>
+            {isLoading ? "✨ جاري البحث..." : (availableProducts.length === 0 ? "المنتجات غير متاحة للبحث" : "ابحث عن الهدية المثالية ✨")}
           </Button>
+           {availableProducts.length === 0 && !isLoading && <p className="text-xs text-center text-amber-500 mt-2">قائمة المنتجات فارغة حالياً. قد تحتاج إلى إضافتها أو نشرها أولاً.</p>}
         </form>
       )}
 
