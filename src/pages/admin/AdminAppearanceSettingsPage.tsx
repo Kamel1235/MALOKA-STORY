@@ -51,7 +51,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
-    setTimeout(() => setFeedback(null), 5000);
+    setTimeout(() => setFeedback(null), 7000);
   };
 
   const handleSaveLogo = async () => {
@@ -67,7 +67,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
       const base64Logo = await fileToBase64(newLogoFile);
       setSettings(prev => prev ? ({ ...prev, siteLogoUrl: base64Logo }) : null);
       setNewLogoFile(null); 
-      showFeedback('success', 'تم تحديث الشعار في جلسة العمل الحالية. لا تنسَ "نشر التغييرات".');
+      showFeedback('success', 'تم تحديث الشعار في جلسة العمل الحالية. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
     } catch (error) {
       console.error("Error saving logo:", error);
       showFeedback('error', 'حدث خطأ أثناء حفظ الشعار.');
@@ -88,7 +88,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
       const base64Images = await Promise.all(base64Promises);
       setSettings(prev => prev ? ({ ...prev, heroSliderImages: base64Images }) : null);
       setNewHeroImageFiles(null);
-      showFeedback('success', 'تم تحديث صور السلايدر في جلسة العمل الحالية. لا تنسَ "نشر التغييرات".');
+      showFeedback('success', 'تم تحديث صور السلايدر في جلسة العمل الحالية. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
     } catch (error) {
       console.error("Error saving hero images:", error);
       showFeedback('error', 'حدث خطأ أثناء حفظ صور السلايدر.');
@@ -100,11 +100,9 @@ const AdminAppearanceSettingsPage: React.FC = () => {
       showFeedback('error', 'خطأ: لا يمكن تحديث الإعدادات حالياً.');
       return;
     }
-    // The actual default value should ideally come from a pristine settings.json structure or a hardcoded constant
-    // For simplicity, using DEFAULT_FALLBACK_SITE_LOGO_URL from constants.ts
     setSettings(prev => prev ? ({ ...prev, siteLogoUrl: defaultSettingsLogo }) : null);
     setNewLogoFile(null);
-    showFeedback('success', 'تم استعادة الشعار الافتراضي لهذه الجلسة. لا تنسَ "نشر التغييرات".');
+    showFeedback('success', 'تم استعادة الشعار الافتراضي لهذه الجلسة. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
   };
 
   const handleRevertToDefaultHeroImages = () => {
@@ -114,7 +112,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
     }
     setSettings(prev => prev ? ({ ...prev, heroSliderImages: [] }) : null);
     setNewHeroImageFiles(null);
-    showFeedback('success', 'تم استعادة صور السلايدر الافتراضية لهذه الجلسة. لا تنسَ "نشر التغييرات".');
+    showFeedback('success', 'تم استعادة صور السلايدر الافتراضية لهذه الجلسة. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
   };
 
   if (isLoading && !settings) {
@@ -155,7 +153,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
               label="اختر شعار جديد (يفضل PNG بخلفية شفافة):"
               type="file"
               accept="image/*"
-              onChange={handleLogoFileChange}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewLogoFile(e.target.files ? e.target.files[0] : null)}
               className="mb-3"
             />
             {newLogoPreview && (
@@ -192,7 +190,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
             type="file"
             multiple
             accept="image/*"
-            onChange={handleHeroFilesChange}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHeroImageFiles(e.target.files)}
             className="mb-3"
           />
           {newHeroImagePreviews.length > 0 && (

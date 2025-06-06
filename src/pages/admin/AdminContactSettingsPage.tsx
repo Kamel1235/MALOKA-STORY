@@ -35,11 +35,11 @@ const AdminContactSettingsPage: React.FC = () => {
         if (!prevSettings) return null; // Should not happen if settings are loaded
         return { ...prevSettings, contactInfo: formData };
       });
-      setFeedback('تم تحديث معلومات التواصل في جلسة العمل الحالية. لا تنسَ "نشر التغييرات" لجعلها دائمة.');
+      setFeedback('تم تحديث معلومات التواصل في جلسة العمل الحالية. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
     } else {
       setFeedback('خطأ: لا يمكن حفظ الإعدادات حالياً.');
     }
-    setTimeout(() => setFeedback(null), 5000);
+    setTimeout(() => setFeedback(null), 7000);
   };
 
   if (isLoading && !settings) {

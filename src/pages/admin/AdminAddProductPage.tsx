@@ -128,7 +128,8 @@ const AdminAddProductPage: React.FC = () => {
       const fileInput = document.getElementById('imageFiles') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
-      setFeedback(`تمت إضافة المنتج "${productToAdd.name}" بنجاح إلى جلسة العمل الحالية. اذهب إلى "نشر التغييرات" لجعله دائماً.`);
+      setFeedback(`تمت إضافة المنتج "${productToAdd.name}" بنجاح إلى جلسة العمل الحالية. لجعل المنتج دائماً ومرئياً للجميع، اذهب إلى صفحة 'نشر التغييرات' وقم بتحديث ملفات الموقع.`);
+      setTimeout(() => setFeedback(null), 7000);
       // navigate('/admin/dashboard/products'); // Don't navigate immediately, let admin publish
 
     } catch (error) {

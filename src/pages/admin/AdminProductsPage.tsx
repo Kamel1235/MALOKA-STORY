@@ -143,16 +143,16 @@ const AdminProductsPage: React.FC = () => {
     setProducts(prevProducts => 
       prevProducts.map(p => p.id === productToSave.id ? productToSave : p)
     );
-    setFeedback(`تم تحديث المنتج "${productToSave.name}" بنجاح في جلسة العمل الحالية. لا تنسَ "نشر التغييرات" لتصبح دائمة.`);
-    setTimeout(() => setFeedback(null), 5000);
+    setFeedback(`تم تحديث المنتج "${productToSave.name}" في جلسة العمل الحالية. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة 'نشر التغييرات' وقم بتحديث ملفات الموقع.`);
+    setTimeout(() => setFeedback(null), 7000);
     closeEditModal();
   };
 
   const handleDeleteProduct = (productId: string, productName: string) => {
-    if (window.confirm(`هل أنت متأكد أنك تريد حذف المنتج "${productName}"؟ هذا الإجراء سيقوم بإزالته من جلسة العمل الحالية. ستحتاج إلى "نشر التغييرات" لجعل الحذف دائماً.`)) {
+    if (window.confirm(`هل أنت متأكد أنك تريد حذف المنتج "${productName}"؟ هذا الإجراء سيقوم بإزالته من جلسة العمل الحالية. لجعل الحذف دائماً ومرئياً للجميع، اذهب إلى صفحة 'نشر التغييرات' وقم بتحديث ملفات الموقع.`)) {
       setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-      setFeedback(`تم حذف المنتج "${productName}" من جلسة العمل الحالية. لا تنسَ "نشر التغييرات".`);
-      setTimeout(() => setFeedback(null), 5000);
+      setFeedback(`تم حذف المنتج "${productName}" من جلسة العمل الحالية. لجعل الحذف دائماً ومرئياً للجميع، اذهب إلى صفحة 'نشر التغييرات' وقم بتحديث ملفات الموقع.`);
+      setTimeout(() => setFeedback(null), 7000);
     }
   };
   
