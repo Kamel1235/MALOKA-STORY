@@ -1,15 +1,18 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import ProductCard from '../components/products/ProductCard';
 import ImageSlider from '../components/products/ImageSlider';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { Product } from '../types';
 import { INITIAL_PRODUCTS } from '../data/mockProducts';
 import { THEME_COLORS, ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY } from '../constants';
+import GiftAssistantModal from '../components/GiftAssistantModal'; // Import the new modal
+import Button from '../components/ui/Button'; // Import Button
 
 const HomePage: React.FC = () => {
   const [products] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
   const [customHeroImages] = useLocalStorage<string[]>(ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY, []);
+  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false); // State for modal
 
   let heroImagesToDisplay: string[];
 
@@ -29,6 +32,23 @@ const HomePage: React.FC = () => {
       <ImageSlider images={heroImagesToDisplay} altText="عروض مميزة" isHero={true} />
       
       <div className="container mx-auto px-4 py-12">
+        {/* Gift Assistant Button Section */}
+        <section className="mb-16 text-center">
+            <h2 className={`text-3xl font-bold ${THEME_COLORS.accentGold} mb-3`}>🎁 هل تبحث عن هدية مميزة؟</h2>
+            <p className={`${THEME_COLORS.textSecondary} text-lg mb-6 max-w-xl mx-auto`}>
+                دع "مساعد الهدايا من ملوكة" يساعدك في العثور على القطعة المثالية لتعبر بها عن مشاعرك!
+            </p>
+            <Button 
+                variant="primary" 
+                size="lg" 
+                onClick={() => setIsGiftModalOpen(true)}
+                className="shadow-lg hover:shadow-amber-500/50 transform hover:scale-105"
+                aria-label="افتح مساعد الهدايا"
+            >
+                جرب مساعد الهدايا الآن ✨
+            </Button>
+        </section>
+
         <section className="mb-16">
           <h2 className={`text-4xl font-bold text-center mb-2 ${THEME_COLORS.accentGold}`}>أحدث المنتجات</h2>
           <h3 className={`text-2xl font-bold text-center mb-8 ${THEME_COLORS.accentGoldDarker}`}>MALOKA STORY</h3>
@@ -53,6 +73,12 @@ const HomePage: React.FC = () => {
           </div>
         </section>
       </div>
+      {/* Gift Assistant Modal */}
+      <GiftAssistantModal 
+        isOpen={isGiftModalOpen}
+        onClose={() => setIsGiftModalOpen(false)}
+        availableProducts={products}
+      />
     </div>
   );
 };

@@ -23,7 +23,6 @@ export const DEFAULT_SITE_LOGO_URL = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo
 export const ADMIN_SETTINGS_SITE_LOGO_KEY = 'adminSiteLogoUrl';
 export const ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY = 'adminHeroSliderImages';
 
-
 export const NAVIGATION_LINKS = [
   { name: "الرئيسية", path: "/", icon: "HomeIcon" },
   { name: "حلق", path: "/category/حلق", icon: "EarringIcon" },
@@ -41,3 +40,21 @@ export const INITIAL_CONTACT_INFO: ContactInfo = {
   tiktok: '#',
   workingHours: 'السبت - الخميس، 9 صباحًا - 6 مساءً',
 };
+
+// LocalStorage Keys
+export const STORAGE_PRODUCTS_KEY = 'products';
+export const STORAGE_ORDERS_KEY = 'orders';
+export const STORAGE_CONTACT_INFO_KEY = 'contactInformation';
+export const STORAGE_ADMIN_AUTH_KEY = 'isAdminAuthenticated';
+export const STORAGE_GEMINI_API_KEY = 'geminiApiKey';
+
+// Consolidate all managed keys for data import/export
+export const MANAGED_STORAGE_KEYS = [
+  STORAGE_PRODUCTS_KEY,
+  STORAGE_ORDERS_KEY,
+  STORAGE_CONTACT_INFO_KEY,
+  STORAGE_ADMIN_AUTH_KEY,
+  ADMIN_SETTINGS_SITE_LOGO_KEY,
+  ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY,
+  STORAGE_GEMINI_API_KEY,
+];

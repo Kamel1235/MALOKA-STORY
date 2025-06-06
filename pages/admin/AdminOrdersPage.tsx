@@ -48,30 +48,30 @@ const AdminOrdersPage: React.FC = () => {
         <table className="min-w-full divide-y divide-purple-700">
           <thead className="bg-purple-800">
             <tr>
-              <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>تاريخ الطلب</th>
-              <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>اسم العميل</th>
-              <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>رقم التليفون</th>
-              <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>الإجمالي</th>
-              <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>الحالة</th>
-              <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>إجراءات</th>
+              <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>تاريخ الطلب</th>
+              <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>اسم العميل</th>
+              <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>رقم التليفون</th>
+              <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>الإجمالي</th>
+              <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>الحالة</th>
+              <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>إجراءات</th>
             </tr>
           </thead>
           <tbody className={`divide-y divide-purple-800 ${THEME_COLORS.textPrimary}`}>
             {orders.sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()).map((order) => (
               <React.Fragment key={order.id}>
               <tr>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{new Date(order.orderDate).toLocaleDateString('ar-EG')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{order.customerName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{order.phoneNumber}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{order.totalAmount} جنيه</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm">{new Date(order.orderDate).toLocaleDateString('ar-EG')}</td>
+                <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm">{order.customerName}</td>
+                <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm">{order.phoneNumber}</td>
+                <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm">{order.totalAmount} جنيه</td>
+                <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)} text-white`}>
-                    {order.status === 'Pending' ? 'قيد الانتظar' : order.status === 'Processed' ? 'قيد التجهيز' : order.status === 'Shipped' ? 'تم الشحن' : 'تم التسليم'}
+                    {order.status === 'Pending' ? 'قيد الانتظار' : order.status === 'Processed' ? 'قيد التجهيز' : order.status === 'Shipped' ? 'تم الشحن' : 'تم التسليم'}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2 space-x-reverse">
-                  <Button size="sm" variant="secondary" onClick={() => toggleOrderStatus(order.id, order.status)}>تغيير الحالة</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}>
+                <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm space-y-1 md:space-y-0 md:space-x-2 md:space-x-reverse flex flex-col md:flex-row items-start">
+                  <Button size="sm" variant="secondary" onClick={() => toggleOrderStatus(order.id, order.status)} className="w-full md:w-auto">تغيير الحالة</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)} className="w-full md:w-auto">
                     {expandedOrderId === order.id ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
                   </Button>
                 </td>

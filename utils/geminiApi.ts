@@ -1,17 +1,36 @@
 
 import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
-import { ProductCategory } from '../types';
+import { ProductCategory, Product } from '../types';
+import { STORAGE_GEMINI_API_KEY } from '../constants';
 
-// IMPORTANT: This uses process.env.API_KEY as per strict guidelines.
-// Ensure API_KEY is set in your execution environment.
-const API_KEY = process.env.API_KEY;
+let effectiveApiKey: string | null = null;
+const apiKeyMissingErrorMsg = "مفتاح Gemini API غير مُعد أو غير صالح. يرجى إضافته من خلال لوحة التحكم (إعدادات المظهر > إعدادات مفتاح Gemini API).";
 
-if (!API_KEY) {
-  console.warn("API_KEY for Gemini is not set in environment variables. AI features will not work.");
+try {
+  const storedApiKeyItem = localStorage.getItem(STORAGE_GEMINI_API_KEY);
+  if (storedApiKeyItem) {
+    // useLocalStorage stores string values JSON-encoded, so we need to parse it.
+    const parsedKey = JSON.parse(storedApiKeyItem); 
+    if (typeof parsedKey === 'string' && parsedKey.trim() !== '') {
+      effectiveApiKey = parsedKey;
+    }
+  }
+} catch (error) {
+  console.error(`Error reading ${STORAGE_GEMINI_API_KEY} from localStorage:`, error);
 }
 
-const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
-const modelName = 'gemini-2.5-flash-preview-04-17'; // This model supports multimodal input
+const ai = effectiveApiKey ? new GoogleGenAI({ apiKey: effectiveApiKey }) : null;
+
+if (!ai && effectiveApiKey !== null) { // Log warning only if an attempt to set key was made but failed, or if it was never set
+    if(!localStorage.getItem(STORAGE_GEMINI_API_KEY)) {
+        console.warn(apiKeyMissingErrorMsg + " (المفتاح غير موجود في التخزين المحلي)");
+    } else {
+        console.warn(apiKeyMissingErrorMsg + " (قد يكون المفتاح المخزن غير صالح أو حدث خطأ أثناء التهيئة)");
+    }
+} else if (!ai && effectiveApiKey === null) {
+     console.info("Gemini API key not yet configured by user. AI features will be disabled until set in Admin Panel.");
+}
+
 
 export interface ImageInput {
   mimeType: string;
@@ -25,7 +44,7 @@ export const generateProductDescription = async (
   imageInput: ImageInput | null = null
 ): Promise<string> => {
   if (!ai) {
-    return Promise.reject("Gemini API client is not initialized. Check API_KEY.");
+    return Promise.reject(apiKeyMissingErrorMsg);
   }
 
   const parts: Part[] = [];
@@ -47,14 +66,18 @@ ${existingNotes ? `ملاحظات إضافية أو كلمات مفتاحية أ
         data: imageInput.data,
       },
     });
-    parts.push({ text: "الآن، بالتركيز بشكل أساسي على الصورة التي تم توفيرها أعلاه، قم بصياغة الوصف. استخدم المعلومات النصية السابقة (الاسم، الفئة، الملاحظات الأولية) فقط لتكملة أو تأكيد التفاصيل المرئية في الصورة." });
+    let imageFocusPrompt = "الآن، بالتركيز بشكل أساسي على الصورة التي تم توفيرها أعلاه، قم بصياغة الوصف. استخدم المعلومات النصية السابقة (الاسم، الفئة، الملاحظات الأولية) فقط لتكملة أو تأكيد التفاصيل المرئية في الصورة.";
+    if (category === ProductCategory.Rings) {
+      imageFocusPrompt += " ركز بشكل خاص على وصف شكل الخاتم الظاهر في الصورة (مثلاً: دائري، بيضاوي، مربع، تصميم هندسي، ملتوي، مفتوح، إلخ) وأي أحجار كريمة أو نقوش أو تفاصيل تصميمية فريدة أخرى مرئية في الخاتم.";
+    }
+    parts.push({ text: imageFocusPrompt });
   }
 
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-        model: modelName,
-        contents: { parts }, // Pass as Content object with parts array
+        model: 'gemini-2.5-flash-preview-04-17',
+        contents: { parts }, 
     });
     return response.text.trim();
   } catch (error) {
@@ -72,7 +95,7 @@ export const getStylingTips = async (
   productDescription: string
 ): Promise<string> => {
   if (!ai) {
-    return Promise.reject("Gemini API client is not initialized. Check API_KEY.");
+    return Promise.reject(apiKeyMissingErrorMsg);
   }
   const prompt = `أنت خبير تنسيق أزياء (ستايلست) لمتجر إكسسوارات من الستانلس ستيل اسمه 'Maloka Story'.
 المنتج الحالي:
@@ -84,8 +107,8 @@ export const getStylingTips = async (
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-        model: modelName,
-        contents: prompt, // Text-only model for this one is fine, or can upgrade if needed
+        model: 'gemini-2.5-flash-preview-04-17',
+        contents: prompt,
     });
     return response.text.trim();
   } catch (error) {
@@ -94,5 +117,101 @@ export const getStylingTips = async (
          throw new Error('فشل جلب النصائح بسبب قيود السلامة.');
     }
     throw new Error('فشل في جلب نصائح التنسيق. يرجى المحاولة مرة أخرى.');
+  }
+};
+
+export interface GiftSuggestionInput {
+  recipient: string;
+  occasion: string;
+  stylePreference: string;
+  budget: string;
+  availableProducts: Pick<Product, 'id' | 'name' | 'category' | 'price' | 'description'>[];
+}
+
+export interface GiftSuggestion {
+  productName: string;
+  reason: string;
+  productId?: string;
+}
+
+export const suggestGifts = async (input: GiftSuggestionInput): Promise<GiftSuggestion[] | string> => {
+  if (!ai) {
+    return Promise.reject(apiKeyMissingErrorMsg);
+  }
+
+  const productListText = input.availableProducts.map(
+    (p, index) => 
+    `${index + 1}. اسم المنتج: ${p.name}, الفئة: ${p.category}, السعر: ${p.price} جنيه, الوصف: ${p.description.substring(0,100)}...`
+  ).join('\n');
+
+  const prompt = `أنت "مساعد الهدايا من ملوكة"، خبير في اقتراح هدايا إكسسوارات من متجر "Maloka Story".
+مهمتك هي مساعدة المستخدم في إيجاد الهدية المثالية بناءً على إجاباته وقائمة المنتجات المتوفرة.
+
+معلومات من المستخدم:
+- الهدية موجهة لـ: ${input.recipient}
+- المناسبة: ${input.occasion}
+- الستايل المفضل للشخص: ${input.stylePreference}
+- الميزانية التقريبية: ${input.budget}
+
+قائمة المنتجات المتوفرة للاختيار منها (يرجى اختيار 2-3 منتجات فقط من هذه القائمة):
+${productListText}
+
+التعليمات:
+1. اقترح 2 أو 3 منتجات من القائمة أعلاه كهدية.
+2. يجب أن يكون كل اقتراح مصحوبًا بشرح موجز (جملة واحدة أو اثنتين) لسبب اختيارك لهذا المنتج بناءً على معطيات المستخدم.
+3. قم بتنسيق الإجابة بحيث يكون كل اقتراح على النحو التالي، مع استخدام الفاصل "---" بين كل اقتراح والآخر إذا كان هناك أكثر من اقتراح:
+   اسم المنتج: [اسم المنتج المقترح بالضبط كما هو في القائمة]
+   سبب الاقتراح: [شرحك الموجز]
+4. إذا لم تجد أي منتج من القائمة مناسبًا تمامًا بناءً على معايير المستخدم، اذكر ذلك بلطف في جملة واحدة، مثل: "لم أجد منتجًا يطابق هذه المعايير بدقة في الوقت الحالي. ربما يمكنك تجربة معايير بحث مختلفة أو تصفح الأقسام مباشرة."
+5. لا تقم بتضمين أي مقدمات أو خواتيم إضافية خارج نسق الاقتراحات المطلوبة أو رسالة عدم التطابق.
+
+الآن، بناءً على ما سبق، ما هي أفضل 2-3 هدايا يمكنك اقتراحها؟
+`;
+
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-preview-04-17',
+      contents: prompt,
+      config: { temperature: 0.7 } 
+    });
+
+    const textResponse = response.text.trim();
+
+    if (textResponse.includes("لم أجد منتجًا يطابق") || textResponse.includes("لا يوجد منتج مناسب")) {
+      return textResponse; 
+    }
+    
+    const suggestions: GiftSuggestion[] = [];
+    const suggestionBlocks = textResponse.split('---').map(block => block.trim()).filter(block => block);
+
+    for (const block of suggestionBlocks) {
+      const nameMatch = block.match(/اسم المنتج:\s*(.*)/i);
+      const reasonMatch = block.match(/سبب الاقتراح:\s*(.*)/i);
+
+      if (nameMatch && nameMatch[1] && reasonMatch && reasonMatch[1]) {
+        const productName = nameMatch[1].trim();
+        const reason = reasonMatch[1].trim();
+        const matchedProduct = input.availableProducts.find(p => p.name.trim().toLowerCase() === productName.toLowerCase());
+        suggestions.push({ 
+          productName, 
+          reason,
+          productId: matchedProduct?.id 
+        });
+      }
+    }
+    
+    if (suggestions.length === 0 && !textResponse.startsWith("لم أجد منتجًا يطابق")) {
+        console.warn("Gemini response for gift suggestion was not in expected format:", textResponse);
+        return "لم أتمكن من فهم اقتراحات الهدايا. الرجاء المحاولة مرة أخرى أو تعديل بحثك.";
+    }
+
+    return suggestions;
+
+  } catch (error) {
+    console.error('Error suggesting gifts:', error);
+    if (error instanceof Error && error.message.includes("SAFETY")) {
+      throw new Error('فشل اقتراح الهدايا بسبب قيود السلامة. حاول تعديل معايير البحث.');
+    }
+    throw new Error('فشل في اقتراح الهدايا. يرجى المحاولة مرة أخرى.');
   }
 };

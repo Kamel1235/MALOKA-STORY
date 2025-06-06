@@ -14,22 +14,22 @@ import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminAddProductPage from './pages/admin/AdminAddProductPage';
 import AdminContactSettingsPage from './pages/admin/AdminContactSettingsPage';
-import AdminAppearanceSettingsPage from './pages/admin/AdminAppearanceSettingsPage'; // Import new page
+import AdminAppearanceSettingsPage from './pages/admin/AdminAppearanceSettingsPage';
+import AdminDataManagementPage from './pages/admin/AdminDataManagementPage'; // Import new page
 import useLocalStorage from './hooks/useLocalStorage';
-import { THEME_COLORS } from './constants';
+import { THEME_COLORS, STORAGE_ADMIN_AUTH_KEY } from './constants';
 
 
 const AdminRouteGuard: React.FC<{ isAuthenticated: boolean; onLogout: () => void }> = ({ isAuthenticated, onLogout }) => {
   if (!isAuthenticated) {
     return <Navigate to="/admin" replace />;
   }
-  // Pass children to AdminDashboardLayout which will render Outlet
   return <AdminDashboardLayout onLogout={onLogout}><Outlet /></AdminDashboardLayout>;
 };
 
 
 const App: React.FC = () => {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useLocalStorage<boolean>('isAdminAuthenticated', false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useLocalStorage<boolean>(STORAGE_ADMIN_AUTH_KEY, false);
   
   const handleLoginSuccess = () => {
     setIsAdminAuthenticated(true);
@@ -54,13 +54,13 @@ const App: React.FC = () => {
             
             <Route path="/admin" element={isAdminAuthenticated ? <Navigate to="/admin/dashboard/orders" replace /> : <AdminLoginPage onLoginSuccess={handleLoginSuccess} />} />
             
-            {/* AdminRouteGuard now wraps specific admin routes */}
             <Route element={<AdminRouteGuard isAuthenticated={isAdminAuthenticated} onLogout={handleLogout}/>}>
                 <Route path="/admin/dashboard/orders" element={<AdminOrdersPage />} />
                 <Route path="/admin/dashboard/products" element={<AdminProductsPage />} />
                 <Route path="/admin/dashboard/add-product" element={<AdminAddProductPage />} />
                 <Route path="/admin/dashboard/contact-settings" element={<AdminContactSettingsPage />} />
-                <Route path="/admin/dashboard/appearance-settings" element={<AdminAppearanceSettingsPage />} /> {/* Add new route */}
+                <Route path="/admin/dashboard/appearance-settings" element={<AdminAppearanceSettingsPage />} />
+                <Route path="/admin/dashboard/data-management" element={<AdminDataManagementPage />} /> {/* Add new route */}
                 <Route path="/admin/dashboard" element={<Navigate to="/admin/dashboard/orders" replace />} />
             </Route>
 

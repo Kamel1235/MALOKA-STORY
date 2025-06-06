@@ -102,7 +102,6 @@ const AdminProductsPage: React.FC = () => {
         imageInput = extractImageDataFromDataUrl(currentProduct.images[0]);
         if (!imageInput) {
             console.warn("Could not extract base64 from existing image URL:", currentProduct.images[0]);
-            // Optionally, inform user or proceed without image for AI
         }
     }
 
@@ -110,8 +109,8 @@ const AdminProductsPage: React.FC = () => {
       const description = await generateProductDescription(
         currentProduct.name, 
         currentProduct.category, 
-        currentProduct.description, // Pass current description as notes
-        imageInput // Pass image data if available
+        currentProduct.description, 
+        imageInput 
       );
       setCurrentProduct(prev => prev ? { ...prev, description } : null);
     } catch (error: any) {
@@ -152,9 +151,24 @@ const AdminProductsPage: React.FC = () => {
   };
 
   const handleDeleteProduct = (productId: string) => {
-    if (window.confirm('هل أنت متأكد أنك تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.')) {
-      setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-    }
+    // TEMPORARILY REMOVED window.confirm FOR DIRECT TESTING
+    console.log(`[AdminProductsPage] handleDeleteProduct called for ID: ${productId}. Bypassing confirm for test.`);
+    alert(`TEST: Attempting to delete product ID: ${productId}. Check console.`); // For immediate feedback
+
+    setProducts(prevProducts => {
+      console.log(`[AdminProductsPage] Current products before filtering (ID: ${productId}):`, JSON.parse(JSON.stringify(prevProducts)));
+      const updatedProducts = prevProducts.filter(p => p.id !== productId);
+      console.log(`[AdminProductsPage] Products after filtering (ID: ${productId}):`, JSON.parse(JSON.stringify(updatedProducts)));
+      if (prevProducts.length === updatedProducts.length) {
+        console.warn(`[AdminProductsPage] Product with ID ${productId} was not found or filter failed.`);
+      }
+      return updatedProducts;
+    });
+    console.log(`[AdminProductsPage] setProducts call completed for product ID: ${productId}. Check UI and localStorage.`);
+    // You can re-add window.confirm later:
+    // if (window.confirm('هل أنت متأكد أنك تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.')) {
+    //   setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+    // }
   };
   
   const filteredProducts = products.filter(product => 
@@ -164,14 +178,14 @@ const AdminProductsPage: React.FC = () => {
 
   return (
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl`}>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className={`text-3xl font-bold ${THEME_COLORS.accentGold}`}>إدارة المنتجات ({filteredProducts.length})</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+        <h1 className={`text-2xl sm:text-3xl font-bold ${THEME_COLORS.accentGold}`}>إدارة المنتجات ({filteredProducts.length})</h1>
         <Input 
             type="text" 
             placeholder="ابحث عن منتج..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
+            className="w-full sm:w-64"
         />
       </div>
       
@@ -182,30 +196,40 @@ const AdminProductsPage: React.FC = () => {
           <table className="min-w-full divide-y divide-purple-700">
             <thead className="bg-purple-800">
               <tr>
-                <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>صورة</th>
-                <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>اسم المنتج</th>
-                <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>السعر</th>
-                <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>الفئة</th>
-                <th scope="col" className={`px-6 py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>إجراءات</th>
+                <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>صورة</th>
+                <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>اسم المنتج</th>
+                <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider hidden sm:table-cell`}>السعر</th>
+                <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider hidden md:table-cell`}>الفئة</th>
+                <th scope="col" className={`px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-3 text-right text-xs font-medium ${THEME_COLORS.accentGold} uppercase tracking-wider`}>إجراءات</th>
               </tr>
             </thead>
             <tbody className={`divide-y divide-purple-800 ${THEME_COLORS.textPrimary}`}>
               {filteredProducts.map((product) => (
                 <tr key={product.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap">
                     <img 
                       src={product.images[0] || 'https://via.placeholder.com/50'} 
                       alt={product.name} 
-                      className="w-12 h-12 rounded-md object-cover"
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-md object-cover"
                       onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/50')}
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{product.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{product.price} جنيه</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">{product.category}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2 space-x-reverse">
-                    <Button size="sm" variant="secondary" onClick={() => openEditModal(product)}>تعديل</Button>
-                    <Button size="sm" variant="danger" onClick={() => handleDeleteProduct(product.id)}>حذف</Button>
+                  <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm font-medium">{product.name}</td>
+                  <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm hidden sm:table-cell">{product.price} جنيه</td>
+                  <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm hidden md:table-cell">{product.category}</td>
+                  <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm space-y-1 sm:space-y-0 sm:space-x-2 sm:space-x-reverse flex flex-col sm:flex-row items-start">
+                    <Button size="sm" variant="secondary" onClick={() => openEditModal(product)} className="w-full sm:w-auto">تعديل</Button>
+                    <Button 
+                        size="sm" 
+                        variant="danger" 
+                        onClick={() => {
+                            console.log(`[AdminProductsPage] Delete button clicked for product ID: ${product.id}`);
+                            handleDeleteProduct(product.id);
+                        }}
+                        className="w-full sm:w-auto"
+                    >
+                        حذف
+                    </Button>
                   </td>
                 </tr>
               ))}
