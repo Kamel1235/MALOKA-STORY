@@ -6,7 +6,7 @@ import Textarea from '../../components/ui/Textarea';
 import Modal from '../../components/ui/Modal';
 import { THEME_COLORS } from '../../constants';
 import { generateProductDescription, ImageInput } from '../../utils/geminiApi';
-import { useData } from '../../contexts/DataContext'; // Import useData
+import { useData } from '../../contexts/DataContext';
 
 const fileToImageInputOnEdit = (file: File): Promise<ImageInput> => {
   return new Promise((resolve, reject) => {
@@ -34,15 +34,16 @@ const extractImageDataFromDataUrl = (dataUrl: string): ImageInput | null => {
 }
 
 const AdminProductsPage: React.FC = () => {
-  const { products, setProducts, isLoading } = useData(); // Use products and setProducts from DataContext
+  const { products, updateProduct, deleteProduct, isLoading, error: dataError } = useData();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [currentProductForEdit, setCurrentProductForEdit] = useState<Product | null>(null); // Renamed to avoid conflict
+  const [currentProductForEdit, setCurrentProductForEdit] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingImageFiles, setEditingImageFiles] = useState<FileList | null>(null);
   
   const [isGeneratingDescInModal, setIsGeneratingDescInModal] = useState(false);
   const [descGenerationErrorInModal, setDescGenerationErrorInModal] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
 
   const openEditModal = (product: Product) => {
@@ -65,10 +66,8 @@ const AdminProductsPage: React.FC = () => {
     if (!currentProductForEdit) return;
     const { name, value } = e.target;
 
-    if (name === "images") return; 
-
     if (name === "price") {
-        setCurrentProductForEdit({ ...currentProductForEdit, [name]: parseFloat(value) });
+        setCurrentProductForEdit({ ...currentProductForEdit, [name]: parseFloat(value) || 0 });
     } else {
         setCurrentProductForEdit({ ...currentProductForEdit, [name]: value });
     }
@@ -86,13 +85,11 @@ const AdminProductsPage: React.FC = () => {
     setDescGenerationErrorInModal(null);
 
     let imageInput: ImageInput | null = null;
-
     if (editingImageFiles && editingImageFiles.length > 0) {
         try {
             imageInput = await fileToImageInputOnEdit(editingImageFiles[0]);
         } catch (error) {
-            console.error("Error converting new image for AI (edit modal):", error);
-            setDescGenerationErrorInModal("خطأ في معالجة الصورة الجديدة. حاول مرة أخرى.");
+            setDescGenerationErrorInModal("خطأ في معالجة الصورة الجديدة.");
             setIsGeneratingDescInModal(false);
             return;
         }
@@ -117,42 +114,52 @@ const AdminProductsPage: React.FC = () => {
 
   const handleSaveProduct = async () => {
     if (!currentProductForEdit) return;
+    setActionInProgress(true);
+    setFeedback(null);
 
-    let productToSave = { ...currentProductForEdit };
+    let productToUpdate = { ...currentProductForEdit };
 
     if (editingImageFiles && editingImageFiles.length > 0) {
       try {
-        const imagePromises = Array.from(editingImageFiles).map(file => {
-          return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        });
-        const base64Images = await Promise.all(imagePromises);
-        productToSave.images = base64Images;
+        const imagePromises = Array.from(editingImageFiles).map(file => 
+          fileToImageInputOnEdit(file).then(imgInput => `data:${imgInput.mimeType};base64,${imgInput.data}`)
+        );
+        productToUpdate.images = await Promise.all(imagePromises);
       } catch (error) {
-        console.error("Error converting images to Base64 for edit:", error);
-        setFeedback("حدث خطأ أثناء تحديث الصور. لم يتم حفظ التغييرات.");
-        setTimeout(() => setFeedback(null), 3000);
+        setFeedback("حدث خطأ أثناء تحديث الصور.");
+        setActionInProgress(false);
         return; 
       }
     }
+    
+    // Only send fields that might have changed, or send the whole object if your backend handles it
+    const { id, ...updateData } = productToUpdate;
 
-    setProducts(prevProducts => 
-      prevProducts.map(p => p.id === productToSave.id ? productToSave : p)
-    );
-    setFeedback(`تم تحديث المنتج "${productToSave.name}" في جلسة العمل الحالية. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة 'نشر التغييرات' وقم بتحديث ملفات الموقع.`);
-    setTimeout(() => setFeedback(null), 7000);
-    closeEditModal();
+    try {
+      await updateProduct(id, updateData);
+      setFeedback(`تم تحديث المنتج "${productToUpdate.name}" بنجاح. التغييرات مباشرة الآن.`);
+      closeEditModal();
+    } catch (err: any) {
+      setFeedback(`فشل تحديث المنتج: ${err.message}`);
+    } finally {
+      setActionInProgress(false);
+      setTimeout(() => setFeedback(null), 5000);
+    }
   };
 
-  const handleDeleteProduct = (productId: string, productName: string) => {
-    if (window.confirm(`هل أنت متأكد أنك تريد حذف المنتج "${productName}"؟ هذا الإجراء سيقوم بإزالته من جلسة العمل الحالية. لجعل الحذف دائماً ومرئياً للجميع، اذهب إلى صفحة 'نشر التغييرات' وقم بتحديث ملفات الموقع.`)) {
-      setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-      setFeedback(`تم حذف المنتج "${productName}" من جلسة العمل الحالية. لجعل الحذف دائماً ومرئياً للجميع، اذهب إلى صفحة 'نشر التغييرات' وقم بتحديث ملفات الموقع.`);
-      setTimeout(() => setFeedback(null), 7000);
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    if (window.confirm(`هل أنت متأكد أنك تريد حذف المنتج "${productName}"؟ هذا الإجراء لا يمكن التراجع عنه وسيحذفه نهائياً.`)) {
+      setActionInProgress(true);
+      setFeedback(null);
+      try {
+        await deleteProduct(productId);
+        setFeedback(`تم حذف المنتج "${productName}" بنجاح.`);
+      } catch (err: any) {
+        setFeedback(`فشل حذف المنتج: ${err.message}`);
+      } finally {
+        setActionInProgress(false);
+        setTimeout(() => setFeedback(null), 5000);
+      }
     }
   };
   
@@ -166,6 +173,14 @@ const AdminProductsPage: React.FC = () => {
       <p className={`${THEME_COLORS.textSecondary}`}>جاري تحميل المنتجات...</p>
     </div>;
   }
+
+  if (dataError && !products.length) {
+    return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+        <p className={`${THEME_COLORS.accentGold} font-semibold`}>خطأ في تحميل المنتجات:</p>
+        <p className="text-red-400 text-sm">{dataError}</p>
+    </div>;
+  }
+
 
   return (
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl`}>
@@ -181,7 +196,7 @@ const AdminProductsPage: React.FC = () => {
       </div>
       
       {feedback && (
-        <div className="mb-4 p-3 rounded-md bg-green-600 text-white text-center transition-opacity duration-300">
+        <div className={`mb-4 p-3 rounded-md text-white text-center ${feedback.includes('فشل') || feedback.includes('خطأ') ? 'bg-red-600' : 'bg-green-600'}`}>
           {feedback}
         </div>
       )}
@@ -215,11 +230,12 @@ const AdminProductsPage: React.FC = () => {
                   <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm hidden sm:table-cell">{product.price} جنيه</td>
                   <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm hidden md:table-cell">{product.category}</td>
                   <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm space-y-1 sm:space-y-0 sm:space-x-2 sm:space-x-reverse flex flex-col sm:flex-row items-start">
-                    <Button size="sm" variant="secondary" onClick={() => openEditModal(product)} className="w-full sm:w-auto">تعديل</Button>
+                    <Button size="sm" variant="secondary" onClick={() => openEditModal(product)} disabled={actionInProgress} className="w-full sm:w-auto">تعديل</Button>
                     <Button 
                         size="sm" 
                         variant="danger" 
                         onClick={() => handleDeleteProduct(product.id, product.name)}
+                        disabled={actionInProgress}
                         className="w-full sm:w-auto"
                     >
                         حذف
@@ -272,12 +288,12 @@ const AdminProductsPage: React.FC = () => {
             <div>
                 <div className="flex justify-between items-center mb-1">
                     <label htmlFor="modal_description" className={`block text-sm font-medium ${THEME_COLORS.textSecondary}`}>
-                        الوصف (يمكن اقتراحه بناءً على الصورة والاسم)
+                        الوصف
                     </label>
                     <Button 
                         type="button" 
                         onClick={handleSuggestDescriptionInModal} 
-                        disabled={isGeneratingDescInModal || !currentProductForEdit.name || !currentProductForEdit.category}
+                        disabled={isGeneratingDescInModal || actionInProgress || !currentProductForEdit.name || !currentProductForEdit.category}
                         size="sm"
                         variant="ghost"
                         className="text-xs"
@@ -311,8 +327,10 @@ const AdminProductsPage: React.FC = () => {
             </div>
             
             <div className="flex justify-end space-x-3 space-x-reverse pt-4">
-              <Button type="button" variant="ghost" onClick={closeEditModal}>إلغاء</Button>
-              <Button type="submit" variant="primary">حفظ التعديلات للجلسة</Button>
+              <Button type="button" variant="ghost" onClick={closeEditModal} disabled={actionInProgress}>إلغاء</Button>
+              <Button type="submit" variant="primary" disabled={actionInProgress}>
+                {actionInProgress ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+              </Button>
             </div>
           </form>
         </Modal>

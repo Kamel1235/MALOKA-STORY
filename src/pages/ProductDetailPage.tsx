@@ -8,12 +8,12 @@ import OrderForm from '../components/products/OrderForm';
 import { THEME_COLORS } from '../constants';
 import ProductCard from '../components/products/ProductCard';
 import { getStylingTips } from '../utils/geminiApi';
-import { useData } from '../contexts/DataContext'; // Import useData
+import { useData } from '../contexts/DataContext';
 
 const ProductDetailPage: React.FC = () => {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const { products, orders, setOrders, isLoading } = useData(); // Use products and orders from DataContext
+  const { products, isLoading, addOrder } = useData(); 
   
   const [product, setProduct] = useState<Product | undefined>(undefined);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
@@ -35,14 +35,14 @@ const ProductDetailPage: React.FC = () => {
         setStylingTipsError(null);
         setIsFetchingTips(false);
       } else {
-        // Optional: navigate to a 404 page or home if product not found after loading
-        // For now, it will show loading or "product not found" message
+        // console.log(`Product with ID ${productId} not found.`);
+        // navigate('/404'); // Or handle appropriately
       }
     }
     window.scrollTo(0, 0);
   }, [productId, products, isLoading, navigate]);
 
-  const handleOrderSubmit = (orderDetails: Omit<Order, 'id' | 'orderDate' | 'status' | 'totalAmount' | 'items'> & { productId: string; quantity: number }) => {
+  const handleOrderSubmit = async (orderDetails: Omit<Order, 'id' | 'orderDate' | 'status' | 'totalAmount' | 'items'> & { productId: string; quantity: number }) => {
     setOrderFeedback(null); 
 
     if (!product) {
@@ -50,36 +50,31 @@ const ProductDetailPage: React.FC = () => {
       return;
     }
 
-    try {
-      const orderItem: OrderItem = {
-        productId: product.id,
-        productName: product.name,
-        quantity: orderDetails.quantity,
-        price: product.price,
-        productImage: product.images[0] || 'https://via.placeholder.com/100?text=No+Image',
-      };
+    const orderItem: OrderItem = {
+      productId: product.id,
+      productName: product.name,
+      quantity: orderDetails.quantity,
+      price: product.price,
+      productImage: product.images[0] || 'https://via.placeholder.com/100?text=No+Image',
+    };
 
-      const newOrder: Order = {
-        id: new Date().toISOString() + Math.random().toString(36).substr(2, 9),
+    const orderDataForApi: Omit<Order, 'id' | 'orderDate' | 'status'> = {
         customerName: orderDetails.customerName,
         phoneNumber: orderDetails.phoneNumber,
         address: orderDetails.address,
         items: [orderItem],
         totalAmount: product.price * orderDetails.quantity,
-        orderDate: new Date().toISOString(),
-        status: 'Pending',
-      };
+    };
 
-      setOrders(prevOrders => [...prevOrders, newOrder]); // setOrders comes from useData, updates localStorage
+    try {
+      await addOrder(orderDataForApi); // Call addOrder from DataContext
       setIsOrderModalOpen(false); 
       setOrderFeedback({ 
         type: 'success', 
         message: 'تم استلام طلبك بنجاح! سنتواصل معك قريباً لتأكيد الطلب.',
         image: product.images[0] || undefined
       });
-      
       setTimeout(() => setOrderFeedback(null), 7000); 
-
     } catch (error) {
       console.error("Order submission error:", error);
       setOrderFeedback({ type: 'error', message: "حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى أو الاتصال بنا إذا تكررت المشكلة." });
@@ -105,8 +100,14 @@ const ProductDetailPage: React.FC = () => {
     return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>جاري تحميل المنتج...</div>;
   }
   
-  if (!product) {
+  if (!product && !isLoading) { // Added !isLoading condition
      return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>المنتج غير موجود أو لم يتم تحميله.</div>;
+  }
+  
+  // Render nothing or a minimal placeholder if product is still undefined after loading.
+  // This can happen if the product ID is invalid.
+  if (!product) {
+    return null; 
   }
 
 

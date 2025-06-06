@@ -2,23 +2,26 @@ import React, { useState } from 'react';
 import { Order } from '../../types';
 import { THEME_COLORS } from '../../constants';
 import Button from '../../components/ui/Button';
-import { useData } from '../../contexts/DataContext'; // Import useData
+import { useData } from '../../contexts/DataContext';
 
 const AdminOrdersPage: React.FC = () => {
-  const { orders, setOrders } = useData(); // Use orders and setOrders from DataContext
+  const { orders, updateOrderStatus, isLoading, error } = useData();
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const toggleOrderStatus = (orderId: string, currentStatus: Order['status']) => {
+  const handleToggleStatus = async (orderId: string, currentStatus: Order['status']) => {
+    setActionError(null);
     let nextStatus: Order['status'] = 'Pending';
     if (currentStatus === 'Pending') nextStatus = 'Processed';
     else if (currentStatus === 'Processed') nextStatus = 'Shipped';
     else if (currentStatus === 'Shipped') nextStatus = 'Delivered';
     
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId ? { ...order, status: nextStatus } : order
-      )
-    );
+    try {
+      await updateOrderStatus(orderId, nextStatus);
+    } catch (err: any) {
+      setActionError(`فشل تحديث حالة الطلب: ${err.message}`);
+      setTimeout(() => setActionError(null), 5000);
+    }
   };
   
   const getStatusColor = (status: Order['status']) => {
@@ -31,6 +34,19 @@ const AdminOrdersPage: React.FC = () => {
     }
   };
 
+  if (isLoading && !orders.length) {
+    return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+      <p className={`${THEME_COLORS.textSecondary}`}>جاري تحميل الطلبات...</p>
+    </div>;
+  }
+  
+  if (error && !orders.length) {
+     return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+      <p className={`${THEME_COLORS.accentGold} font-semibold`}>خطأ في تحميل الطلبات:</p>
+      <p className="text-red-400 text-sm">{error}</p>
+    </div>;
+  }
+
 
   if (orders.length === 0) {
     return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
@@ -42,6 +58,7 @@ const AdminOrdersPage: React.FC = () => {
   return (
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl`}>
       <h1 className={`text-3xl font-bold ${THEME_COLORS.accentGold} mb-8`}>الطلبات المستلمة ({orders.length})</h1>
+      {actionError && <p className="text-red-400 bg-red-900/50 p-3 rounded-md mb-4 text-center">{actionError}</p>}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-purple-700">
           <thead className="bg-purple-800">
@@ -68,7 +85,7 @@ const AdminOrdersPage: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-2 py-2 sm:px-4 sm:py-3 lg:px-6 lg:py-4 whitespace-nowrap text-sm space-y-1 md:space-y-0 md:space-x-2 md:space-x-reverse flex flex-col md:flex-row items-start">
-                  <Button size="sm" variant="secondary" onClick={() => toggleOrderStatus(order.id, order.status)} className="w-full md:w-auto">تغيير الحالة</Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleToggleStatus(order.id, order.status)} className="w-full md:w-auto">تغيير الحالة</Button>
                   <Button size="sm" variant="ghost" onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)} className="w-full md:w-auto">
                     {expandedOrderId === order.id ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
                   </Button>

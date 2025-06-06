@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { THEME_COLORS, SITE_NAME, NAVIGATION_LINKS, DEFAULT_FALLBACK_SITE_LOGO_URL } from '../../constants';
+import { THEME_COLORS, SITE_NAME, NAVIGATION_LINKS } from '../../constants';
 import { EarringIcon } from '../icons/EarringIcon';
 import { RingIcon } from '../icons/RingIcon';
 import { NecklaceIcon } from '../icons/NecklaceIcon';
@@ -9,8 +9,11 @@ import { ContactIcon } from '../icons/ContactIcon';
 import { HomeIcon } from '../icons/HomeIcon';
 import { MenuIcon } from '../icons/MenuIcon';
 import { CloseIcon } from '../icons/CloseIcon';
-import { PublishIcon } from '../icons/PublishIcon'; // Import new icon
-import { useData } from '../../contexts/DataContext'; // Import useData
+// PublishIcon is no longer needed for header navigation if "Publish Changes" is admin-only and in admin sidebar
+import { useData } from '../../contexts/DataContext'; 
+
+// Define a fallback logo URL directly or import if it's a general fallback
+const FALLBACK_LOGO = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png";
 
 const IconMap: { [key: string]: React.FC<{className?: string}> } = {
   HomeIcon,
@@ -19,22 +22,23 @@ const IconMap: { [key: string]: React.FC<{className?: string}> } = {
   NecklaceIcon,
   OfferIcon,
   ContactIcon,
-  PublishIcon, // Add new icon to map
+  // PublishIcon no longer needed here if removed from user-facing NAVIGATION_LINKS
 };
 
 const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { settings, isLoading } = useData(); // Use siteLogoUrl from DataContext
+  const { settings, isLoading } = useData();
 
-  const siteLogoUrl = settings?.siteLogoUrl || DEFAULT_FALLBACK_SITE_LOGO_URL;
+  // Determine logo: use settings.siteLogoUrl if available, otherwise use a hardcoded fallback.
+  const siteLogoUrl = settings?.siteLogoUrl || FALLBACK_LOGO;
 
   const activeLinkStyle = `${THEME_COLORS.accentGold} font-bold`;
   const inactiveLinkStyle = `${THEME_COLORS.textSecondary} hover:${THEME_COLORS.accentGold}`;
 
-  // Filter out admin-specific links for the main navigation shown to users
-  const userNavigationLinks = NAVIGATION_LINKS.filter(link => !link.path.startsWith('/admin/dashboard/publish'));
+  // User navigation links (ensure "PublishIcon" related links are not here if they were for admin)
+  const userNavLinks = NAVIGATION_LINKS.filter(link => link.icon !== "PublishIcon");
 
-  const navItems = userNavigationLinks.map(link => {
+  const navItems = userNavLinks.map(link => {
     const IconComponent = IconMap[link.icon];
     return (
       <NavLink
@@ -61,8 +65,11 @@ const Header: React.FC = () => {
                 src={siteLogoUrl} 
                 alt="Maloka Story Logo" 
                 className="h-10 w-auto mr-3 object-contain"
-                onError={(e) => (e.currentTarget.src = DEFAULT_FALLBACK_SITE_LOGO_URL)}
+                onError={(e) => (e.currentTarget.src = FALLBACK_LOGO)} // Fallback for broken images
                 />
+            )}
+            {(isLoading || !siteLogoUrl) && !settings && ( /* Show placeholder if still loading and no settings yet */
+                 <div className="h-10 w-24 mr-3 bg-purple-700 rounded animate-pulse"></div>
             )}
             <span>{SITE_NAME}</span>
           </Link>

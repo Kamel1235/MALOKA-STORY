@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  THEME_COLORS, 
-  DEFAULT_FALLBACK_SITE_LOGO_URL,
-} from '../../constants';
+import { THEME_COLORS } from '../../constants';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
-import { useData } from '../../contexts/DataContext'; // Import useData
+import { useData } from '../../contexts/DataContext'; 
+
+const FALLBACK_LOGO_URL = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png"; // Define a constant for fallback
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -17,7 +16,7 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 const AdminAppearanceSettingsPage: React.FC = () => {
-  const { settings, setSettings, isLoading } = useData();
+  const { settings, updateSettings, isLoading, error: dataError } = useData();
 
   const [newLogoFile, setNewLogoFile] = useState<File | null>(null);
   const [newLogoPreview, setNewLogoPreview] = useState<string | null>(null);
@@ -26,10 +25,11 @@ const AdminAppearanceSettingsPage: React.FC = () => {
   const [newHeroImagePreviews, setNewHeroImagePreviews] = useState<string[]>([]);
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null); // 'logo', 'hero', null
 
-  const siteLogoUrlToDisplay = settings?.siteLogoUrl || DEFAULT_FALLBACK_SITE_LOGO_URL;
+  // Determine display values based on settings from context or fallbacks
+  const siteLogoUrlToDisplay = settings?.siteLogoUrl || FALLBACK_LOGO_URL;
   const heroImagesToDisplay = settings?.heroSliderImages || [];
-  const defaultSettingsLogo = DEFAULT_FALLBACK_SITE_LOGO_URL; // Assuming this is the hardcoded default from initial settings.json
 
   useEffect(() => {
     if (newLogoFile) {
@@ -51,7 +51,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
-    setTimeout(() => setFeedback(null), 7000);
+    setTimeout(() => setFeedback(null), 5000);
   };
 
   const handleSaveLogo = async () => {
@@ -59,18 +59,21 @@ const AdminAppearanceSettingsPage: React.FC = () => {
       showFeedback('error', 'يرجى اختيار ملف شعار أولاً.');
       return;
     }
-    if (!setSettings || !settings) {
-      showFeedback('error', 'خطأ: لا يمكن تحديث الإعدادات حالياً.');
-      return;
+    if (!settings) {
+        showFeedback('error', 'خطأ: إعدادات الموقع غير محملة.');
+        return;
     }
+    setActionInProgress('logo');
+    setFeedback(null);
     try {
       const base64Logo = await fileToBase64(newLogoFile);
-      setSettings(prev => prev ? ({ ...prev, siteLogoUrl: base64Logo }) : null);
+      await updateSettings({ ...settings, siteLogoUrl: base64Logo });
       setNewLogoFile(null); 
-      showFeedback('success', 'تم تحديث الشعار في جلسة العمل الحالية. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
-    } catch (error) {
-      console.error("Error saving logo:", error);
-      showFeedback('error', 'حدث خطأ أثناء حفظ الشعار.');
+      showFeedback('success', 'تم حفظ الشعار بنجاح. التغييرات مباشرة الآن.');
+    } catch (error: any) {
+      showFeedback('error', `حدث خطأ أثناء حفظ الشعار: ${error.message}`);
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -79,40 +82,59 @@ const AdminAppearanceSettingsPage: React.FC = () => {
       showFeedback('error', 'يرجى اختيار ملف واحد على الأقل لصور السلايدر.');
       return;
     }
-     if (!setSettings || !settings) {
-      showFeedback('error', 'خطأ: لا يمكن تحديث الإعدادات حالياً.');
-      return;
+    if (!settings) {
+        showFeedback('error', 'خطأ: إعدادات الموقع غير محملة.');
+        return;
     }
+    setActionInProgress('hero');
+    setFeedback(null);
     try {
       const base64Promises = Array.from(newHeroImageFiles).map(file => fileToBase64(file));
       const base64Images = await Promise.all(base64Promises);
-      setSettings(prev => prev ? ({ ...prev, heroSliderImages: base64Images }) : null);
+      await updateSettings({ ...settings, heroSliderImages: base64Images });
       setNewHeroImageFiles(null);
-      showFeedback('success', 'تم تحديث صور السلايدر في جلسة العمل الحالية. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
-    } catch (error) {
-      console.error("Error saving hero images:", error);
-      showFeedback('error', 'حدث خطأ أثناء حفظ صور السلايدر.');
+      showFeedback('success', 'تم حفظ صور السلايدر بنجاح. التغييرات مباشرة الآن.');
+    } catch (error: any) {
+      showFeedback('error', `حدث خطأ أثناء حفظ صور السلايدر: ${error.message}`);
+    } finally {
+        setActionInProgress(null);
     }
   };
   
-  const handleRevertToDefaultLogo = () => {
-     if (!setSettings || !settings) {
-      showFeedback('error', 'خطأ: لا يمكن تحديث الإعدادات حالياً.');
-      return;
+  const handleRevertToDefaultLogo = async () => {
+    if (!settings) {
+        showFeedback('error', 'خطأ: إعدادات الموقع غير محملة.');
+        return;
     }
-    setSettings(prev => prev ? ({ ...prev, siteLogoUrl: defaultSettingsLogo }) : null);
-    setNewLogoFile(null);
-    showFeedback('success', 'تم استعادة الشعار الافتراضي لهذه الجلسة. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
+    setActionInProgress('logo');
+    setFeedback(null);
+    try {
+        await updateSettings({ ...settings, siteLogoUrl: FALLBACK_LOGO_URL });
+        setNewLogoFile(null);
+        showFeedback('success', 'تم استعادة الشعار الافتراضي بنجاح. التغييرات مباشرة الآن.');
+    } catch (error: any) {
+        showFeedback('error', `فشل استعادة الشعار الافتراضي: ${error.message}`);
+    } finally {
+        setActionInProgress(null);
+    }
   };
 
-  const handleRevertToDefaultHeroImages = () => {
-     if (!setSettings || !settings) {
-      showFeedback('error', 'خطأ: لا يمكن تحديث الإعدادات حالياً.');
-      return;
+  const handleRevertToDefaultHeroImages = async () => {
+     if (!settings) {
+        showFeedback('error', 'خطأ: إعدادات الموقع غير محملة.');
+        return;
     }
-    setSettings(prev => prev ? ({ ...prev, heroSliderImages: [] }) : null);
-    setNewHeroImageFiles(null);
-    showFeedback('success', 'تم استعادة صور السلايدر الافتراضية لهذه الجلسة. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
+    setActionInProgress('hero');
+    setFeedback(null);
+    try {
+        await updateSettings({ ...settings, heroSliderImages: [] }); // Empty array for default (product-derived)
+        setNewHeroImageFiles(null);
+        showFeedback('success', 'تم استعادة صور السلايدر الافتراضية بنجاح. التغييرات مباشرة الآن.');
+    } catch (error: any) {
+        showFeedback('error', `فشل استعادة صور السلايدر: ${error.message}`);
+    } finally {
+        setActionInProgress(null);
+    }
   };
 
   if (isLoading && !settings) {
@@ -120,7 +142,13 @@ const AdminAppearanceSettingsPage: React.FC = () => {
       <p className={`${THEME_COLORS.textSecondary}`}>جاري تحميل إعدادات المظهر...</p>
     </div>;
   }
-   if (!settings) {
+   if (dataError && !settings) {
+     return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+        <p className={`${THEME_COLORS.accentGold} font-semibold`}>خطأ في تحميل إعدادات المظهر:</p>
+        <p className="text-red-400 text-sm">{dataError}</p>
+    </div>;
+  }
+   if (!settings) { // Should be caught by isLoading, but as a safeguard
      return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
       <p className={`${THEME_COLORS.textSecondary}`}>لم يتم تحميل إعدادات المظهر.</p>
     </div>;
@@ -145,7 +173,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
                 src={siteLogoUrlToDisplay} 
                 alt="Current Site Logo" 
                 className="h-20 w-auto object-contain bg-purple-800/50 p-2 rounded border border-purple-700"
-                onError={(e) => (e.currentTarget.src = DEFAULT_FALLBACK_SITE_LOGO_URL)}
+                onError={(e) => (e.currentTarget.src = FALLBACK_LOGO_URL)}
             />
           </div>
           <div>
@@ -155,6 +183,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
               accept="image/*"
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewLogoFile(e.target.files ? e.target.files[0] : null)}
               className="mb-3"
+              disabled={actionInProgress === 'logo'}
             />
             {newLogoPreview && (
               <div className="mb-4">
@@ -163,8 +192,12 @@ const AdminAppearanceSettingsPage: React.FC = () => {
               </div>
             )}
             <div className="flex space-x-3 space-x-reverse">
-                <Button onClick={handleSaveLogo} disabled={!newLogoFile}>حفظ الشعار الجديد للجلسة</Button>
-                <Button onClick={handleRevertToDefaultLogo} variant="secondary">استعادة الافتراضي للجلسة</Button>
+                <Button onClick={handleSaveLogo} disabled={!newLogoFile || actionInProgress === 'logo'}>
+                    {actionInProgress === 'logo' ? 'جاري الحفظ...' : 'حفظ الشعار الجديد'}
+                </Button>
+                <Button onClick={handleRevertToDefaultLogo} variant="secondary" disabled={actionInProgress === 'logo'}>
+                    استعادة الافتراضي
+                </Button>
             </div>
           </div>
         </div>
@@ -192,6 +225,7 @@ const AdminAppearanceSettingsPage: React.FC = () => {
             accept="image/*"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewHeroImageFiles(e.target.files)}
             className="mb-3"
+            disabled={actionInProgress === 'hero'}
           />
           {newHeroImagePreviews.length > 0 && (
             <div className="mb-4">
@@ -204,8 +238,12 @@ const AdminAppearanceSettingsPage: React.FC = () => {
             </div>
           )}
           <div className="flex space-x-3 space-x-reverse">
-            <Button onClick={handleSaveHeroImages} disabled={!newHeroImageFiles || newHeroImageFiles.length === 0}>حفظ صور السلايدر للجلسة</Button>
-            <Button onClick={handleRevertToDefaultHeroImages} variant="secondary">استعادة الافتراضي للجلسة</Button>
+            <Button onClick={handleSaveHeroImages} disabled={!newHeroImageFiles || newHeroImageFiles.length === 0 || actionInProgress === 'hero'}>
+                {actionInProgress === 'hero' ? 'جاري الحفظ...' : 'حفظ صور السلايدر'}
+            </Button>
+            <Button onClick={handleRevertToDefaultHeroImages} variant="secondary" disabled={actionInProgress === 'hero'}>
+                استعادة الافتراضي
+            </Button>
           </div>
         </div>
       </section>

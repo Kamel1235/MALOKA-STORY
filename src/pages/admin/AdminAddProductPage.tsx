@@ -6,7 +6,7 @@ import Textarea from '../../components/ui/Textarea';
 import { THEME_COLORS } from '../../constants';
 import { useNavigate } from 'react-router-dom';
 import { generateProductDescription, ImageInput } from '../../utils/geminiApi';
-import { useData } from '../../contexts/DataContext'; // Import useData
+import { useData } from '../../contexts/DataContext';
 
 const fileToImageInput = (file: File): Promise<ImageInput> => {
   return new Promise((resolve, reject) => {
@@ -27,7 +27,7 @@ const fileToImageInput = (file: File): Promise<ImageInput> => {
 
 
 const AdminAddProductPage: React.FC = () => {
-  const { setProducts } = useData(); // Use setProducts from DataContext
+  const { addProduct } = useData();
   const navigate = useNavigate();
 
   const initialFormState: Omit<Product, 'id' | 'images'> = {
@@ -37,19 +37,20 @@ const AdminAddProductPage: React.FC = () => {
     category: ProductCategory.Earrings, 
   };
   
-  const [newProduct, setNewProduct] = useState<Omit<Product, 'id' | 'images'>>(initialFormState);
+  const [newProductData, setNewProductData] = useState<Omit<Product, 'id' | 'images'>>(initialFormState);
   const [selectedImageFiles, setSelectedImageFiles] = useState<FileList | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [descGenerationError, setDescGenerationError] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setNewProduct(prev => ({
+    setNewProductData(prev => ({
       ...prev,
-      [name]: name === 'price' ? parseFloat(value) : value,
+      [name]: name === 'price' ? parseFloat(value) || 0 : value,
     }));
     if (name === 'description' && descGenerationError) {
       setDescGenerationError(null); 
@@ -61,7 +62,7 @@ const AdminAddProductPage: React.FC = () => {
   };
 
   const handleSuggestDescription = async () => {
-    if (!newProduct.name || !newProduct.category) {
+    if (!newProductData.name || !newProductData.category) {
       setDescGenerationError("يرجى إدخال اسم المنتج والفئة أولاً لاقتراح وصف.");
       return;
     }
@@ -73,8 +74,7 @@ const AdminAddProductPage: React.FC = () => {
       try {
         imageInput = await fileToImageInput(selectedImageFiles[0]);
       } catch (error) {
-        console.error("Error converting image for AI description:", error);
-        setDescGenerationError("خطأ في معالجة الصورة. حاول مرة أخرى.");
+        setDescGenerationError("خطأ في معالجة الصورة.");
         setIsGeneratingDesc(false);
         return;
       }
@@ -82,12 +82,12 @@ const AdminAddProductPage: React.FC = () => {
 
     try {
       const description = await generateProductDescription(
-        newProduct.name, 
-        newProduct.category, 
-        newProduct.description, 
+        newProductData.name, 
+        newProductData.category, 
+        newProductData.description, 
         imageInput
       );
-      setNewProduct(prev => ({ ...prev, description }));
+      setNewProductData(prev => ({ ...prev, description }));
     } catch (error: any) {
       setDescGenerationError(error.message || "حدث خطأ أثناء إنشاء الوصف.");
     } finally {
@@ -99,42 +99,42 @@ const AdminAddProductPage: React.FC = () => {
     e.preventDefault();
     setFormError(null);
     setFeedback(null);
+    setActionInProgress(true);
 
-    if (!newProduct.name || newProduct.price <= 0 || !selectedImageFiles || selectedImageFiles.length === 0) {
-        setFormError("يرجى ملء الاسم، السعر، واختيار صورة واحدة على الأقل للمنتج.");
+    if (!newProductData.name || newProductData.price <= 0 || !selectedImageFiles || selectedImageFiles.length === 0) {
+        setFormError("يرجى ملء الاسم، السعر (أكبر من صفر)، واختيار صورة واحدة على الأقل للمنتج.");
+        setActionInProgress(false);
         return;
     }
 
     try {
-      const imagePromises = Array.from(selectedImageFiles).map(file => {
-        return new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      });
+      const imagePromises = Array.from(selectedImageFiles).map(file => 
+        fileToImageInput(file).then(imgInput => `data:${imgInput.mimeType};base64,${imgInput.data}`)
+      );
       const base64Images = await Promise.all(imagePromises);
 
-      const productToAdd: Product = {
-        ...newProduct,
-        id: new Date().toISOString() + Math.random().toString(36).substr(2, 9), 
+      const productPayload = {
+        ...newProductData,
         images: base64Images,
       };
 
-      setProducts(prevProducts => [...prevProducts, productToAdd]);
-      setNewProduct(initialFormState); 
+      const addedProduct = await addProduct(productPayload);
+      
+      setNewProductData(initialFormState); 
       setSelectedImageFiles(null); 
       const fileInput = document.getElementById('imageFiles') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
-      setFeedback(`تمت إضافة المنتج "${productToAdd.name}" بنجاح إلى جلسة العمل الحالية. لجعل المنتج دائماً ومرئياً للجميع، اذهب إلى صفحة 'نشر التغييرات' وقم بتحديث ملفات الموقع.`);
-      setTimeout(() => setFeedback(null), 7000);
-      // navigate('/admin/dashboard/products'); // Don't navigate immediately, let admin publish
+      setFeedback(`تمت إضافة المنتج "${addedProduct?.name}" بنجاح. التغييرات مباشرة الآن.`);
+      setTimeout(() => {
+        setFeedback(null);
+        // navigate('/admin/dashboard/products'); // Optionally navigate after success
+      }, 5000);
 
-    } catch (error) {
-      console.error("Error processing images for saving:", error);
-      setFormError("حدث خطأ أثناء معالجة الصور للحفظ. يرجى المحاولة مرة أخرى.");
+    } catch (error: any) {
+      setFormError(`فشل إضافة المنتج: ${error.message || 'خطأ غير معروف'}`);
+    } finally {
+      setActionInProgress(false);
     }
   };
 
@@ -148,7 +148,7 @@ const AdminAddProductPage: React.FC = () => {
         <Input 
           label="اسم المنتج" 
           name="name" 
-          value={newProduct.name} 
+          value={newProductData.name} 
           onChange={handleChange} 
           required 
           placeholder="مثال: حلق فضي أنيق"
@@ -174,12 +174,12 @@ const AdminAddProductPage: React.FC = () => {
         <div>
             <div className="flex justify-between items-center mb-1">
                 <label htmlFor="description" className={`block text-sm font-medium ${THEME_COLORS.textSecondary}`}>
-                    وصف المنتج (يمكن اقتراحه بناءً على الصورة والاسم)
+                    وصف المنتج
                 </label>
                 <Button 
                     type="button" 
                     onClick={handleSuggestDescription} 
-                    disabled={isGeneratingDesc || !newProduct.name || !newProduct.category}
+                    disabled={isGeneratingDesc || actionInProgress || !newProductData.name || !newProductData.category}
                     size="sm"
                     variant="ghost"
                     className="text-xs"
@@ -191,7 +191,7 @@ const AdminAddProductPage: React.FC = () => {
             <Textarea 
               id="description"
               name="description" 
-              value={newProduct.description} 
+              value={newProductData.description} 
               onChange={handleChange} 
               placeholder="وصف تفصيلي للمنتج ومميزاته..."
               rows={3}
@@ -203,7 +203,7 @@ const AdminAddProductPage: React.FC = () => {
           label="سعر المنتج (بالجنيه)" 
           name="price" 
           type="number" 
-          value={newProduct.price} 
+          value={newProductData.price} 
           onChange={handleChange} 
           required 
           min="0.01" 
@@ -214,7 +214,7 @@ const AdminAddProductPage: React.FC = () => {
           <select
             id="category"
             name="category"
-            value={newProduct.category}
+            value={newProductData.category}
             onChange={handleChange}
             className={`w-full px-3 py-2 ${THEME_COLORS.inputBackground} ${THEME_COLORS.textPrimary} border ${THEME_COLORS.borderColor} rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:${THEME_COLORS.borderColorGold} sm:text-sm`}
           >
@@ -224,8 +224,8 @@ const AdminAddProductPage: React.FC = () => {
           </select>
         </div>
        
-        <Button type="submit" variant="primary" size="lg" className="w-full">
-          إضافة المنتج للجلسة الحالية
+        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={actionInProgress}>
+          {actionInProgress ? 'جاري الإضافة...' : 'إضافة المنتج'}
         </Button>
       </form>
     </div>

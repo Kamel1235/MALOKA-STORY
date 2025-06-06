@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
@@ -14,10 +14,9 @@ import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminAddProductPage from './pages/admin/AdminAddProductPage';
 import AdminContactSettingsPage from './pages/admin/AdminContactSettingsPage';
 import AdminAppearanceSettingsPage from './pages/admin/AdminAppearanceSettingsPage';
-import AdminPublishDataPage from './pages/admin/AdminPublishDataPage'; // New page for publishing
-import useLocalStorage from './hooks/useLocalStorage';
+// AdminPublishDataPage is removed
 import { THEME_COLORS } from './constants';
-import { useData } from './contexts/DataContext'; // Import useData
+import { useData } from './contexts/DataContext';
 
 const AdminRouteGuard: React.FC<{ isAuthenticated: boolean; onLogout: () => void }> = ({ isAuthenticated, onLogout }) => {
   if (!isAuthenticated) {
@@ -27,8 +26,7 @@ const AdminRouteGuard: React.FC<{ isAuthenticated: boolean; onLogout: () => void
 };
 
 const App: React.FC = () => {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useLocalStorage<boolean>('isAdminAuthenticated', false);
-  const { isLoading, error: dataError, settings } = useData(); // Get isLoading and error from DataContext
+  const { isLoading, error: dataError, settings, isAdminAuthenticated, setIsAdminAuthenticated } = useData();
   
   const handleLoginSuccess = () => {
     setIsAdminAuthenticated(true);
@@ -38,11 +36,12 @@ const App: React.FC = () => {
     setIsAdminAuthenticated(false);
   };
 
-  if (isLoading && !settings) { // Show loading state only on initial load if settings are not yet available
+  // Show a more persistent loading screen if essential settings aren't loaded yet
+  if (isLoading && settings === null) { 
     return (
       <div className={`fixed inset-0 ${THEME_COLORS.background} flex flex-col items-center justify-center z-[100]`}>
         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-amber-500"></div>
-        <p className={`${THEME_COLORS.textPrimary} mt-4 text-lg`}>جاري تحميل بيانات المتجر...</p>
+        <p className={`${THEME_COLORS.textPrimary} mt-4 text-lg`}>جاري تحميل بيانات المتجر الأساسية...</p>
       </div>
     );
   }
@@ -55,8 +54,9 @@ const App: React.FC = () => {
           {dataError && (
             <div className="container mx-auto px-4 py-2">
               <div className="bg-red-700 text-white p-4 rounded-md shadow-lg text-center" role="alert">
-                <p className="font-semibold">خطأ في تحميل البيانات!</p>
+                <p className="font-semibold">خطأ في الاتصال بالخادم!</p>
                 <p className="text-sm">{dataError}</p>
+                <p className="text-xs mt-2">قد تكون وظائف Netlify غير موجودة أو هناك مشكلة في الاتصال بالشبكة/قاعدة البيانات.</p>
               </div>
             </div>
           )}
@@ -67,7 +67,10 @@ const App: React.FC = () => {
             <Route path="/offers" element={<OffersPage />} />
             <Route path="/contact" element={<ContactPage />} />
             
-            <Route path="/admin" element={isAdminAuthenticated ? <Navigate to="/admin/dashboard/orders" replace /> : <AdminLoginPage onLoginSuccess={handleLoginSuccess} />} />
+            <Route 
+              path="/admin" 
+              element={isAdminAuthenticated ? <Navigate to="/admin/dashboard/orders" replace /> : <AdminLoginPage onLoginSuccess={handleLoginSuccess} />} 
+            />
             
             <Route element={<AdminRouteGuard isAuthenticated={isAdminAuthenticated} onLogout={handleLogout}/>}>
                 <Route path="/admin/dashboard/orders" element={<AdminOrdersPage />} />
@@ -75,7 +78,7 @@ const App: React.FC = () => {
                 <Route path="/admin/dashboard/add-product" element={<AdminAddProductPage />} />
                 <Route path="/admin/dashboard/contact-settings" element={<AdminContactSettingsPage />} />
                 <Route path="/admin/dashboard/appearance-settings" element={<AdminAppearanceSettingsPage />} />
-                <Route path="/admin/dashboard/publish" element={<AdminPublishDataPage />} /> {/* New Publish Route */}
+                {/* Removed /admin/dashboard/publish route */}
                 <Route path="/admin/dashboard" element={<Navigate to="/admin/dashboard/orders" replace />} />
             </Route>
 

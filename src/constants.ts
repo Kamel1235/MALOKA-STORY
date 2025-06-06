@@ -18,8 +18,8 @@ export const ADMIN_PASSWORD = 'Kamel01112024743'; // كلمة مرور المد�
 
 export const SITE_NAME = "أناقة الستانلس"; // Consistent Site Name
 
-// Default values are now primarily in the settings.json and handled by DataContext if fetch fails
-export const DEFAULT_FALLBACK_SITE_LOGO_URL = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png";
+// Default values will now be handled by the backend or DataContext if API fails or DB is empty.
+// export const DEFAULT_FALLBACK_SITE_LOGO_URL = "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png"; // Removed
 
 export const NAVIGATION_LINKS = [
   { name: "الرئيسية", path: "/", icon: "HomeIcon" },
@@ -28,20 +28,5 @@ export const NAVIGATION_LINKS = [
   { name: "قلادة", path: "/category/قلادة", icon: "NecklaceIcon" },
   { name: "عروض", path: "/offers", icon: "OfferIcon" },
   { name: "تواصل معانا", path: "/contact", icon: "ContactIcon" },
-  { name: "نشر التغييرات", path: "/admin/dashboard/publish", icon: "PublishIcon" }, // Added for admin
+  // { name: "نشر التغييرات", path: "/admin/dashboard/publish", icon: "PublishIcon" }, // Removed
 ];
-
-// Keys for localStorage (admin auth and orders) remain, but not for site content
-// export const ADMIN_SETTINGS_SITE_LOGO_KEY = 'adminSiteLogoUrl'; // Removed
-// export const ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY = 'adminHeroSliderImages'; // Removed
-
-/*
-export const INITIAL_CONTACT_INFO: ContactInfo = { // Removed, now in settings.json
-  phone: '+20 123 456 7890',
-  email: 'support@elegance-store.com',
-  facebook: '#',
-  instagram: '#',
-  tiktok: '#',
-  workingHours: 'السبت - الخميس، 9 صباحًا - 6 مساءً',
-};
-*/

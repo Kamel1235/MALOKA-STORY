@@ -4,20 +4,19 @@ import { THEME_COLORS } from '../../constants';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Textarea from '../../components/ui/Textarea';
-import { useData } from '../../contexts/DataContext'; // Import useData
+import { useData } from '../../contexts/DataContext';
 
 const AdminContactSettingsPage: React.FC = () => {
-  const { settings, setSettings, isLoading } = useData(); // Use settings from DataContext
+  const { settings, updateSettings, isLoading, error: dataError } = useData();
   
-  // Initialize formData with default structure if settings are null/loading
   const initialFormData: ContactInfo = {
     phone: '', email: '', facebook: '', instagram: '', tiktok: '', workingHours: ''
   };
   const [formData, setFormData] = useState<ContactInfo>(settings?.contactInfo || initialFormData);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   useEffect(() => {
-    // Update form data if settings in context change (e.g., initial load completes)
     if (settings?.contactInfo) {
       setFormData(settings.contactInfo);
     }
@@ -28,23 +27,35 @@ const AdminContactSettingsPage: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (setSettings && settings) {
-      setSettings(prevSettings => {
-        if (!prevSettings) return null; // Should not happen if settings are loaded
-        return { ...prevSettings, contactInfo: formData };
-      });
-      setFeedback('تم تحديث معلومات التواصل في جلسة العمل الحالية. لجعل التغييرات دائمة ومرئية للجميع، اذهب إلى صفحة \'نشر التغييرات\' وقم بتحديث ملفات الموقع.');
-    } else {
-      setFeedback('خطأ: لا يمكن حفظ الإعدادات حالياً.');
+    if (!settings) {
+      setFeedback('خطأ: لا يمكن حفظ الإعدادات، بيانات الموقع الرئيسية غير محملة.');
+      return;
     }
-    setTimeout(() => setFeedback(null), 7000);
+    setActionInProgress(true);
+    setFeedback(null);
+    try {
+      await updateSettings({ ...settings, contactInfo: formData });
+      setFeedback('تم حفظ إعدادات التواصل بنجاح. التغييرات مباشرة الآن.');
+    } catch (err: any) {
+      setFeedback(`فشل حفظ الإعدادات: ${err.message}`);
+    } finally {
+      setActionInProgress(false);
+      setTimeout(() => setFeedback(null), 5000);
+    }
   };
 
   if (isLoading && !settings) {
     return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
       <p className={`${THEME_COLORS.textSecondary}`}>جاري تحميل إعدادات التواصل...</p>
+    </div>;
+  }
+  
+  if (dataError && !settings) {
+     return <div className={`p-6 rounded-lg ${THEME_COLORS.cardBackground} text-center`}>
+      <p className={`${THEME_COLORS.accentGold} font-semibold`}>خطأ في تحميل إعدادات التواصل:</p>
+      <p className="text-red-400 text-sm">{dataError}</p>
     </div>;
   }
   
@@ -54,12 +65,13 @@ const AdminContactSettingsPage: React.FC = () => {
     </div>;
   }
 
+
   return (
     <div className={`p-4 md:p-6 rounded-lg ${THEME_COLORS.cardBackground} shadow-xl`}>
       <h1 className={`text-3xl font-bold ${THEME_COLORS.accentGold} mb-8`}>إعدادات التواصل</h1>
       
       {feedback && (
-        <div className="mb-4 p-3 rounded-md bg-green-600 text-white text-center">
+        <div className={`mb-4 p-3 rounded-md text-white text-center ${feedback.includes('فشل') || feedback.includes('خطأ') ? 'bg-red-600' : 'bg-green-600'}`}>
           {feedback}
         </div>
       )}
@@ -112,8 +124,8 @@ const AdminContactSettingsPage: React.FC = () => {
             rows={3}
             placeholder="مثال: السبت - الخميس، 9 صباحًا - 6 مساءً"
         />
-        <Button type="submit" variant="primary" size="lg" className="w-full">
-          حفظ التغييرات للجلسة الحالية
+        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={actionInProgress}>
+          {actionInProgress ? 'جاري الحفظ...' : 'حفظ التغييرات'}
         </Button>
       </form>
     </div>

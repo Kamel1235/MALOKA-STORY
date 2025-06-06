@@ -1,30 +1,29 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { THEME_COLORS, NAVIGATION_LINKS } from '../../constants';
+import { THEME_COLORS } from '../../constants'; // NAVIGATION_LINKS removed from here
 import Button from '../../components/ui/Button';
 import { MenuIcon } from '../../components/icons/MenuIcon';
 import { CloseIcon } from '../../components/icons/CloseIcon';
 import { PublishIcon } from '../../components/icons/PublishIcon';
 import { EarringIcon } from '../../components/icons/EarringIcon';
-import { RingIcon } from '../../components/icons/RingIcon';
-import { HomeIcon } from '../../components/icons/HomeIcon'; // For الطلبات
-import { ContactIcon } from '../../components/icons/ContactIcon'; // For اعدادات التواصل
-import { OfferIcon } from '../../components/icons/OfferIcon'; // For اعدادات المظهر (using as generic settings)
-import { NecklaceIcon } from '../../components/icons/NecklaceIcon'; // For اضافة منتج
+import { RingIcon } from '../../components/icons/RingIcon'; // Keep for potential future use or other icons
+import { HomeIcon } from '../../components/icons/HomeIcon'; 
+import { ContactIcon } from '../../components/icons/ContactIcon'; 
+import { OfferIcon } from '../../components/icons/OfferIcon'; 
+import { NecklaceIcon } from '../../components/icons/NecklaceIcon';
 
 interface AdminDashboardLayoutProps {
   onLogout: () => void;
   children: React.ReactNode; 
 }
 
-// Simplified Icon Map for Admin
 const AdminIconMap: { [key: string]: React.FC<{className?: string}> } = {
-  HomeIcon, // الطلبات
-  EarringIcon, // ادارة المنتجات (using Earring as a generic product icon)
-  NecklaceIcon, // اضافة منتج
-  ContactIcon, // اعدادات التواصل
-  OfferIcon, // اعدادات المظهر
-  PublishIcon, // نشر التغييرات
+  HomeIcon, 
+  EarringIcon, 
+  NecklaceIcon, 
+  ContactIcon, 
+  OfferIcon, 
+  PublishIcon, 
 };
 
 
@@ -43,7 +42,7 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({ onLogout, c
     { name: 'إضافة منتج جديد', path: '/admin/dashboard/add-product', icon: "NecklaceIcon" },
     { name: 'إعدادات التواصل', path: '/admin/dashboard/contact-settings', icon: "ContactIcon" },
     { name: 'إعدادات المظهر', path: '/admin/dashboard/appearance-settings', icon: "OfferIcon" },
-    { name: 'نشر التغييرات', path: '/admin/dashboard/publish', icon: "PublishIcon"},
+    // { name: 'نشر التغييرات', path: '/admin/dashboard/publish', icon: "PublishIcon"}, // Removed
   ];
 
   const activeStyle = `${THEME_COLORS.buttonGold} ${THEME_COLORS.textPrimary}`;
