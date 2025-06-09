@@ -4,13 +4,13 @@ import ProductCard from '../components/products/ProductCard';
 import ImageSlider from '../components/products/ImageSlider';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { Product } from '../types';
-import { INITIAL_PRODUCTS } from '../data/mockProducts';
+import { useData } from '../contexts/DataContext'; // Added
 import { THEME_COLORS, ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY } from '../constants';
 import GiftAssistantModal from '../components/GiftAssistantModal'; // Import the new modal
 import Button from '../components/ui/Button'; // Import Button
 
 const HomePage: React.FC = () => {
-  const [products] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
+  const { products, isLoading, error } = useData(); // Use DataContext
   const [customHeroImages] = useLocalStorage<string[]>(ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY, []);
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false); // State for modal
 
@@ -18,13 +18,17 @@ const HomePage: React.FC = () => {
 
   if (customHeroImages && customHeroImages.length > 0) {
     heroImagesToDisplay = customHeroImages;
-  } else {
+  } else if (products && products.length > 0) { // Use products from DataContext
     const productHeroImages = products.slice(0, 5).map(p => p.images[0]).filter(img => !!img);
     if (productHeroImages.length > 0) {
       heroImagesToDisplay = productHeroImages;
     } else {
+      // Fallback if products exist but have no images
       heroImagesToDisplay = ['https://picsum.photos/seed/hero1/1200/600', 'https://picsum.photos/seed/hero2/1200/600', 'https://picsum.photos/seed/hero3/1200/600'];
     }
+  } else {
+    // Fallback if no custom images and no products (or products loading/error)
+    heroImagesToDisplay = ['https://picsum.photos/seed/hero1/1200/600', 'https://picsum.photos/seed/hero2/1200/600', 'https://picsum.photos/seed/hero3/1200/600'];
   }
   
   return (
@@ -44,6 +48,7 @@ const HomePage: React.FC = () => {
                 onClick={() => setIsGiftModalOpen(true)}
                 className="shadow-lg hover:shadow-amber-500/50 transform hover:scale-105"
                 aria-label="افتح مساعد الهدايا"
+                disabled={isLoading || !!error || !products || products.length === 0} // Disable if no products
             >
                 جرب مساعد الهدايا الآن ✨
             </Button>
@@ -53,14 +58,19 @@ const HomePage: React.FC = () => {
           <h2 className={`text-4xl font-bold text-center mb-2 ${THEME_COLORS.accentGold}`}>أحدث المنتجات</h2>
           <h3 className={`text-2xl font-bold text-center mb-8 ${THEME_COLORS.accentGoldDarker}`}>MALOKA STORY</h3>
           <p className={`${THEME_COLORS.textSecondary} text-center text-lg mb-10`}>تصفح أحدث الإكسسوارات اللي وصلتلنا مخصوص علشانك.</p>
-          {products.length > 0 ? (
+
+          {isLoading && <p className={`text-center text-xl ${THEME_COLORS.textPrimary}`}>جاري تحميل المنتجات...</p>}
+          {error && <p className={`text-center text-xl text-red-400 bg-red-900/30 p-3 rounded-md`}>حدث خطأ أثناء تحميل المنتجات: {error}</p>}
+
+          {!isLoading && !error && products && products.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {products.slice(0, 8).map((product) => ( // Show first 8 products
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
-          ) : (
-            <p className="text-center text-xl text-gray-400">لا توجد منتجات لعرضها حالياً. حاول مرة أخرى لاحقاً.</p>
+          )}
+          {!isLoading && !error && (!products || products.length === 0) && (
+            <p className={`text-center text-xl ${THEME_COLORS.textSecondary}`}>لا توجد منتجات لعرضها حالياً. حاول مرة أخرى لاحقاً.</p>
           )}
         </section>
 

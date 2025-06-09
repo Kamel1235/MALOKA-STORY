@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import useLocalStorage from '../../hooks/useLocalStorage';
+import { useData } from '../../contexts/DataContext';
 import { Product, ProductCategory } from '../../types';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -30,8 +30,8 @@ const fileToImageInput = (file: File): Promise<ImageInput> => {
 
 
 const AdminAddProductPage: React.FC = () => {
-  const [products, setProducts] = useLocalStorage<Product[]>('products', []);
   const navigate = useNavigate();
+  const { addProduct } = useData();
 
   const initialFormState: Omit<Product, 'id' | 'images'> = {
     name: '',
@@ -118,15 +118,23 @@ const AdminAddProductPage: React.FC = () => {
       });
       const base64Images = await Promise.all(imagePromises);
 
-      const productToAdd: Product = {
+      // Prepare product data without ID, as backend will generate it
+      const productData: Omit<Product, 'id'> = {
         ...newProduct,
-        id: new Date().toISOString() + Math.random().toString(36).substr(2, 9), 
         images: base64Images,
       };
 
-      setProducts(prevProducts => [...prevProducts, productToAdd]);
-      setNewProduct(initialFormState); 
-      setSelectedImageFiles(null); 
+      const addedProduct = await addProduct(productData);
+
+      if (!addedProduct) {
+        setFormError("فشل في إضافة المنتج. قد يكون هناك خطأ في الخادم أو البيانات المدخلة.");
+        // Optionally, re-throw or handle specific error messages if addProduct provides them
+        return;
+      }
+
+      // If successful:
+      setNewProduct(initialFormState);
+      setSelectedImageFiles(null);
       const fileInput = document.getElementById('imageFiles') as HTMLInputElement;
       if (fileInput) {
         fileInput.value = '';
@@ -135,9 +143,10 @@ const AdminAddProductPage: React.FC = () => {
       alert('تمت إضافة المنتج بنجاح!');
       navigate('/admin/dashboard/products');
 
-    } catch (error) {
-      console.error("Error processing images for saving:", error);
-      setFormError("حدث خطأ أثناء معالجة الصور للحفظ. يرجى المحاولة مرة أخرى.");
+    } catch (error: any) {
+      console.error("Error in handleSubmit:", error);
+      // More specific error message if possible
+      setFormError(error?.message || "حدث خطأ أثناء إضافة المنتج. يرجى المحاولة مرة أخرى.");
     }
   };
 

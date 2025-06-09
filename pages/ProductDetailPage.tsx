@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import useLocalStorage from '../hooks/useLocalStorage';
+import useLocalStorage from '../hooks/useLocalStorage'; // Will be partially removed for orders later
 import { Product, Order, OrderItem } from '../types';
-import { INITIAL_PRODUCTS } from '../data/mockProducts';
+import { useData } from '../contexts/DataContext'; // Added
 import ImageSlider from '../components/products/ImageSlider';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -15,10 +15,12 @@ import { getStylingTips } from '../utils/geminiApi'; // Import Gemini API util
 const ProductDetailPage: React.FC = () => {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const [products] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
-  const [orders, setOrders] = useLocalStorage<Order[]>('orders', []);
+  // products state will come from useData
+  const { products, isLoading: productsLoading, error: productsError, addOrder } = useData();
+  // const [orders, setOrders] = useLocalStorage<Order[]>('orders', []); // Removed for orders
   
   const [product, setProduct] = useState<Product | undefined>(undefined);
+  const [productFound, setProductFound] = useState<boolean>(true); // To track if product exists
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [orderFeedback, setOrderFeedback] = useState<{type: 'success' | 'error', message: string, image?: string} | null>(null);
@@ -28,59 +30,66 @@ const ProductDetailPage: React.FC = () => {
   const [stylingTipsError, setStylingTipsError] = useState<string | null>(null);
 
   useEffect(() => {
-    const foundProduct = products.find(p => p.id === productId);
-    if (foundProduct) {
-      setProduct(foundProduct);
-      const related = products.filter(p => p.category === foundProduct.category && p.id !== foundProduct.id).slice(0, 3);
-      setRelatedProducts(related);
-      // Reset tips when product changes
-      setStylingTips(null);
-      setStylingTipsError(null);
-      setIsFetchingTips(false);
-    } else {
-      // navigate('/'); // Optional: navigate to a 404 page or home
+    if (products && products.length > 0) { // Check if products are loaded
+      const foundProduct = products.find(p => p.id === productId);
+      if (foundProduct) {
+        setProduct(foundProduct);
+        setProductFound(true);
+        const related = products.filter(p => p.category === foundProduct.category && p.id !== foundProduct.id).slice(0, 3);
+        setRelatedProducts(related);
+        // Reset tips when product changes
+        setStylingTips(null);
+        setStylingTipsError(null);
+        setIsFetchingTips(false);
+      } else {
+        setProduct(undefined);
+        setProductFound(false);
+      }
+    } else if (!productsLoading && products && products.length === 0) { // Products loaded but empty
+        setProduct(undefined);
+        setProductFound(false);
     }
     window.scrollTo(0, 0);
-  }, [productId, products, navigate]);
+  }, [productId, products, navigate, productsLoading]);
 
-  const handleOrderSubmit = (orderDetails: Omit<Order, 'id' | 'orderDate' | 'status' | 'totalAmount' | 'items'> & { productId: string; quantity: number }) => {
-    setOrderFeedback(null); 
+  const handleOrderSubmit = async (formData: Omit<Order, 'id' | 'orderDate' | 'status' | 'totalAmount' | 'items'> & { quantity: number }) => {
+    setOrderFeedback(null);
 
     if (!product) {
       setOrderFeedback({ type: 'error', message: "خطأ في تحميل تفاصيل المنتج. يرجى تحديث الصفحة والمحاولة مرة أخرى." });
       return;
     }
 
+    // Prepare order data for the addOrder function from DataContext
+    // It should be Omit<Order, 'id' | 'orderDate' | 'status'>
+    const newOrderData = {
+        customerName: formData.customerName,
+        phoneNumber: formData.phoneNumber,
+        address: formData.address,
+        items: [{
+            productId: product.id,
+            productName: product.name,
+            quantity: formData.quantity,
+            price: product.price,
+            productImage: product.images[0] || 'https://via.placeholder.com/100?text=No+Image',
+        }],
+        totalAmount: product.price * formData.quantity,
+        // id, orderDate, and status will be set by the backend
+    };
+
     try {
-      const orderItem: OrderItem = {
-        productId: product.id,
-        productName: product.name,
-        quantity: orderDetails.quantity,
-        price: product.price,
-        productImage: product.images[0] || 'https://via.placeholder.com/100?text=No+Image', // Save product image
-      };
-
-      const newOrder: Order = {
-        id: new Date().toISOString() + Math.random().toString(36).substr(2, 9),
-        customerName: orderDetails.customerName,
-        phoneNumber: orderDetails.phoneNumber,
-        address: orderDetails.address,
-        items: [orderItem],
-        totalAmount: product.price * orderDetails.quantity,
-        orderDate: new Date().toISOString(),
-        status: 'Pending',
-      };
-
-      setOrders(prevOrders => [...prevOrders, newOrder]);
-      setIsOrderModalOpen(false); 
-      setOrderFeedback({ 
-        type: 'success', 
-        message: 'تم استلام طلبك بنجاح! سنتواصل معك قريباً لتأكيد الطلب.',
-        image: product.images[0] || undefined
-      });
-      
-      setTimeout(() => setOrderFeedback(null), 7000); 
-
+      const submittedOrder = await addOrder(newOrderData);
+      if (submittedOrder) {
+        setIsOrderModalOpen(false);
+        setOrderFeedback({
+          type: 'success',
+          message: 'تم استلام طلبك بنجاح! سنتواصل معك قريباً لتأكيد الطلب. رقم الطلب: ' + submittedOrder.id,
+          image: product.images[0] || undefined
+        });
+        setTimeout(() => setOrderFeedback(null), 7000);
+      } else {
+        setOrderFeedback({ type: 'error', message: "فشل في إرسال الطلب. يرجى المحاولة مرة أخرى." });
+      }
     } catch (error) {
       console.error("Order submission error:", error);
       setOrderFeedback({ type: 'error', message: "حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى أو الاتصال بنا إذا تكررت المشكلة." });
@@ -102,9 +111,25 @@ const ProductDetailPage: React.FC = () => {
     }
   };
 
-  if (!product) {
-    return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>جاري تحميل المنتج... أو المنتج غير موجود.</div>;
+  if (productsLoading) {
+    return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>جاري تحميل المنتج...</div>;
   }
+
+  if (productsError) {
+    return <div className={`min-h-screen flex flex-col items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary} p-4 text-center`}>
+        <p className="text-xl text-red-400 bg-red-900/30 p-4 rounded-md">خطأ في تحميل بيانات المنتج: {productsError}</p>
+        <p className="mt-2">يرجى المحاولة مرة أخرى لاحقاً.</p>
+    </div>;
+  }
+
+  if (!product && !productsLoading && productFound === false) { // Explicitly check productFound
+    return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>المنتج غير موجود.</div>;
+  }
+
+  if (!product) { // Fallback for any other state where product is not set but not explicitly "not found" yet (e.g. initial render before useEffect runs)
+    return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>جاري تهيئة صفحة المنتج...</div>;
+  }
+
 
   return (
     <div className={`min-h-screen ${THEME_COLORS.background} pb-12 pt-8 bg-gradient-to-bl from-indigo-950 via-purple-900 to-indigo-950`}>
