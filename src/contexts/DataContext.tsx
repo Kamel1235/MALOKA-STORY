@@ -76,7 +76,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Products
   const fetchProducts = useCallback(async () => {
     try {
-      const data = await makeApiCall<Product[]>('/.netlify/functions/products');
+      const data = await makeApiCall<Product[]>('/api/products');
       setProducts(data);
     } catch (err: any) {
       setError(err.message);
@@ -86,7 +86,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addProduct = async (productData: Omit<Product, 'id' | 'images'> & { images: string[] }) => {
     try {
-      const newProduct = await makeApiCall<Product>('/.netlify/functions/products', 'POST', productData);
+      const newProduct = await makeApiCall<Product>('/api/products', 'POST', productData);
       setProducts(prev => [...prev, newProduct]);
       return newProduct;
     } catch (err: any) {
@@ -97,7 +97,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateProduct = async (productId: string, productData: Partial<Product>) => {
     try {
-      const updatedProduct = await makeApiCall<Product>(`/.netlify/functions/products/${productId}`, 'PUT', productData);
+      const updatedProduct = await makeApiCall<Product>(`/api/products/${productId}`, 'PUT', productData);
       setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
       return updatedProduct;
     } catch (err: any) {
@@ -108,7 +108,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const deleteProduct = async (productId: string) => {
     try {
-      await makeApiCall<void>(`/.netlify/functions/products/${productId}`, 'DELETE');
+      await makeApiCall<void>(`/api/products/${productId}`, 'DELETE');
       setProducts(prev => prev.filter(p => p.id !== productId));
     } catch (err: any) {
       setError(err.message);
@@ -119,7 +119,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Settings
   const fetchSettings = useCallback(async () => {
     try {
-      const data = await makeApiCall<SiteSettings>('/.netlify/functions/settings');
+      const data = await makeApiCall<SiteSettings>('/api/settings');
       setSettings(data);
     } catch (err: any) {
       setError(err.message);
@@ -134,7 +134,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // The backend should handle the merging logic or expect a full SiteSettings object.
       // For this client-side `updateSettings`, we pass the partial data, and the backend updates accordingly.
       // The state `settings` is updated with the response from the backend.
-      const updatedSettings = await makeApiCall<SiteSettings>('/.netlify/functions/settings', 'PUT', newSettingsData);
+      const updatedSettings = await makeApiCall<SiteSettings>('/api/settings', 'PUT', newSettingsData);
       setSettings(updatedSettings);
       return updatedSettings;
     } catch (err: any) {
@@ -150,7 +150,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
     }
     try {
-      const data = await makeApiCall<Order[]>('/.netlify/functions/orders');
+      const data = await makeApiCall<Order[]>('/api/orders');
       setOrders(data);
     } catch (err: any) {
       setError(err.message);
@@ -160,7 +160,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addOrder = async (orderData: Omit<Order, 'id' | 'orderDate' | 'status'>) => {
     try {
-      const newOrder = await makeApiCall<Order>('/.netlify/functions/orders', 'POST', orderData);
+      const newOrder = await makeApiCall<Order>('/api/orders', 'POST', orderData);
       return newOrder;
     } catch (err: any) {
       setError(err.message);
@@ -170,7 +170,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
     try {
-      const updatedOrder = await makeApiCall<Order>(`/.netlify/functions/orders/${orderId}`, 'PUT', { status });
+      const updatedOrder = await makeApiCall<Order>(`/api/orders/${orderId}`, 'PUT', { status });
       setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
       return updatedOrder;
     } catch (err: any) {
