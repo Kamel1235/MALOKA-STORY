@@ -151,24 +151,9 @@ const AdminProductsPage: React.FC = () => {
   };
 
   const handleDeleteProduct = (productId: string) => {
-    // TEMPORARILY REMOVED window.confirm FOR DIRECT TESTING
-    console.log(`[AdminProductsPage] handleDeleteProduct called for ID: ${productId}. Bypassing confirm for test.`);
-    alert(`TEST: Attempting to delete product ID: ${productId}. Check console.`); // For immediate feedback
-
-    setProducts(prevProducts => {
-      console.log(`[AdminProductsPage] Current products before filtering (ID: ${productId}):`, JSON.parse(JSON.stringify(prevProducts)));
-      const updatedProducts = prevProducts.filter(p => p.id !== productId);
-      console.log(`[AdminProductsPage] Products after filtering (ID: ${productId}):`, JSON.parse(JSON.stringify(updatedProducts)));
-      if (prevProducts.length === updatedProducts.length) {
-        console.warn(`[AdminProductsPage] Product with ID ${productId} was not found or filter failed.`);
-      }
-      return updatedProducts;
-    });
-    console.log(`[AdminProductsPage] setProducts call completed for product ID: ${productId}. Check UI and localStorage.`);
-    // You can re-add window.confirm later:
-    // if (window.confirm('هل أنت متأكد أنك تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.')) {
-    //   setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-    // }
+    if (window.confirm('هل أنت متأكد أنك تريد حذف هذا المنتج؟ لا يمكن التراجع عن هذا الإجراء.')) {
+      setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+    }
   };
   
   const filteredProducts = products.filter(product => 
@@ -222,10 +207,7 @@ const AdminProductsPage: React.FC = () => {
                     <Button 
                         size="sm" 
                         variant="danger" 
-                        onClick={() => {
-                            console.log(`[AdminProductsPage] Delete button clicked for product ID: ${product.id}`);
-                            handleDeleteProduct(product.id);
-                        }}
+                        onClick={() => handleDeleteProduct(product.id)}
                         className="w-full sm:w-auto"
                     >
                         حذف

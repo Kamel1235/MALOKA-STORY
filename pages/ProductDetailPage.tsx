@@ -2,21 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import { useProducts, useOrders } from '../hooks/useApi';
 import { Product, Order, OrderItem } from '../types';
-import { INITIAL_PRODUCTS } from '../data/mockProducts';
 import ImageSlider from '../components/products/ImageSlider';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import OrderForm from '../components/products/OrderForm';
 import { THEME_COLORS } from '../constants';
 import ProductCard from '../components/products/ProductCard';
-import { getStylingTips } from '../utils/geminiApi'; // Import Gemini API util
+import ConnectionStatus from '../components/ui/ConnectionStatus';
+import { getStylingTips } from '../utils/geminiApi';
 
 const ProductDetailPage: React.FC = () => {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const [products] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
-  const [orders, setOrders] = useLocalStorage<Order[]>('orders', []);
+  const { products, loading: productsLoading } = useProducts();
+  const { createOrder, loading: ordersLoading } = useOrders();
   
   const [product, setProduct] = useState<Product | undefined>(undefined);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
@@ -43,8 +44,8 @@ const ProductDetailPage: React.FC = () => {
     window.scrollTo(0, 0);
   }, [productId, products, navigate]);
 
-  const handleOrderSubmit = (orderDetails: Omit<Order, 'id' | 'orderDate' | 'status' | 'totalAmount' | 'items'> & { productId: string; quantity: number }) => {
-    setOrderFeedback(null); 
+  const handleOrderSubmit = async (orderDetails: Omit<Order, 'id' | 'orderDate' | 'status' | 'totalAmount' | 'items'> & { productId: string; quantity: number }) => {
+    setOrderFeedback(null);
 
     if (!product) {
       setOrderFeedback({ type: 'error', message: "خطأ في تحميل تفاصيل المنتج. يرجى تحديث الصفحة والمحاولة مرة أخرى." });
@@ -52,38 +53,29 @@ const ProductDetailPage: React.FC = () => {
     }
 
     try {
-      const orderItem: OrderItem = {
-        productId: product.id,
-        productName: product.name,
-        quantity: orderDetails.quantity,
-        price: product.price,
-        productImage: product.images[0] || 'https://via.placeholder.com/100?text=No+Image', // Save product image
-      };
-
-      const newOrder: Order = {
-        id: new Date().toISOString() + Math.random().toString(36).substr(2, 9),
+      await createOrder({
         customerName: orderDetails.customerName,
         phoneNumber: orderDetails.phoneNumber,
         address: orderDetails.address,
-        items: [orderItem],
-        totalAmount: product.price * orderDetails.quantity,
-        orderDate: new Date().toISOString(),
-        status: 'Pending',
-      };
+        productId: orderDetails.productId,
+        quantity: orderDetails.quantity,
+      });
 
-      setOrders(prevOrders => [...prevOrders, newOrder]);
-      setIsOrderModalOpen(false); 
-      setOrderFeedback({ 
-        type: 'success', 
-        message: 'تم استلام طلبك بنجاح! سنتواصل معك قريباً لتأكيد الطلب.',
+      setIsOrderModalOpen(false);
+      setOrderFeedback({
+        type: 'success',
+        message: `تم تأكيد طلبك بنجاح! سيتم التواصل معك قريباً على رقم ${orderDetails.phoneNumber}. شكراً لثقتك بنا! 💖`,
         image: product.images[0] || undefined
       });
-      
-      setTimeout(() => setOrderFeedback(null), 7000); 
+
+      setTimeout(() => setOrderFeedback(null), 7000);
 
     } catch (error) {
       console.error("Order submission error:", error);
-      setOrderFeedback({ type: 'error', message: "حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى أو الاتصال بنا إذا تكررت المشكلة." });
+      setOrderFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : "حدث خطأ أثناء إرسال طلبك. يرجى المحاولة مرة أخرى أو الاتصال بنا إذا تكررت المشكلة."
+      });
     }
   };
 
@@ -102,12 +94,38 @@ const ProductDetailPage: React.FC = () => {
     }
   };
 
+  if (productsLoading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>
+        <ConnectionStatus />
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400 mx-auto mb-4"></div>
+          <p>جاري تحميل المنتج...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!product) {
-    return <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>جاري تحميل المنتج... أو المنتج غير موجود.</div>;
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${THEME_COLORS.background} ${THEME_COLORS.textPrimary}`}>
+        <ConnectionStatus />
+        <div className="text-center">
+          <p>المنتج غير موجود</p>
+          <button
+            onClick={() => navigate('/')}
+            className={`mt-4 px-4 py-2 ${THEME_COLORS.buttonGold} text-white rounded-md hover:${THEME_COLORS.buttonGoldHover}`}
+          >
+            العودة للرئيسية
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className={`min-h-screen ${THEME_COLORS.background} pb-12 pt-8 bg-gradient-to-bl from-indigo-950 via-purple-900 to-indigo-950`}>
+      <ConnectionStatus />
       <div className="container mx-auto px-4">
         
         {orderFeedback && (

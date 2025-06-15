@@ -3,16 +3,17 @@ import React, { useState } from 'react';
 import ProductCard from '../components/products/ProductCard';
 import ImageSlider from '../components/products/ImageSlider';
 import useLocalStorage from '../hooks/useLocalStorage';
+import { useProducts } from '../hooks/useApi';
 import { Product } from '../types';
-import { INITIAL_PRODUCTS } from '../data/mockProducts';
 import { THEME_COLORS, ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY } from '../constants';
-import GiftAssistantModal from '../components/GiftAssistantModal'; // Import the new modal
-import Button from '../components/ui/Button'; // Import Button
+import GiftAssistantModal from '../components/GiftAssistantModal';
+import Button from '../components/ui/Button';
+import ConnectionStatus from '../components/ui/ConnectionStatus';
 
 const HomePage: React.FC = () => {
-  const [products] = useLocalStorage<Product[]>('products', INITIAL_PRODUCTS);
+  const { products, loading, error, isOnline } = useProducts();
   const [customHeroImages] = useLocalStorage<string[]>(ADMIN_SETTINGS_HERO_SLIDER_IMAGES_KEY, []);
-  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false); // State for modal
+  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
 
   let heroImagesToDisplay: string[];
 
@@ -27,10 +28,47 @@ const HomePage: React.FC = () => {
     }
   }
   
+  // عرض حالة التحميل
+  if (loading) {
+    return (
+      <div className={`min-h-screen ${THEME_COLORS.background} pb-12 bg-gradient-to-br from-indigo-950 via-purple-900 to-indigo-950`}>
+        <ConnectionStatus />
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400 mx-auto mb-4"></div>
+              <p className={`${THEME_COLORS.textSecondary} text-lg`}>جاري تحميل المنتجات...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // عرض رسالة الخطأ
+  if (error && products.length === 0) {
+    return (
+      <div className={`min-h-screen ${THEME_COLORS.background} pb-12 bg-gradient-to-br from-indigo-950 via-purple-900 to-indigo-950`}>
+        <ConnectionStatus />
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="text-center">
+              <p className="text-red-400 text-lg mb-4">⚠️ {error}</p>
+              <p className={`${THEME_COLORS.textSecondary}`}>
+                {isOnline ? 'حدث خطأ في تحميل البيانات' : 'يتم العمل في الوضع المحلي'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen ${THEME_COLORS.background} pb-12 bg-gradient-to-br from-indigo-950 via-purple-900 to-indigo-950`}>
+      <ConnectionStatus />
       <ImageSlider images={heroImagesToDisplay} altText="عروض مميزة" isHero={true} />
-      
+
       <div className="container mx-auto px-4 py-12">
         {/* Gift Assistant Button Section */}
         <section className="mb-16 text-center">
