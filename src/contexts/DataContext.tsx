@@ -1,19 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Product, ContactInfo, Order, SiteSettings } from '../types'; // SiteSettings is used
-
-// Default initial values for settings if API fails or DB is empty
-const DEFAULT_SETTINGS: SiteSettings = {
-  contactInfo: {
-    phone: '+20 100 000 0000',
-    email: 'default@example.com',
-    facebook: '#',
-    instagram: '#',
-    tiktok: '#',
-    workingHours: 'من 9 صباحًا إلى 5 مساءً',
-  },
-  siteLogoUrl: "https://i.ibb.co/tZPYk6G/Maloka-Story-Logo.png", // Default fallback logo
-  heroSliderImages: [],
-};
+import { Product, ContactInfo, Order, SiteSettings } from '../types';
+import { dataService } from '../services/dataService';
 
 interface DataContextType {
   products: Product[];
@@ -32,7 +19,9 @@ interface DataContextType {
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<Order | undefined>;
   isAdminAuthenticated: boolean;
   setIsAdminAuthenticated: (value: boolean | ((val: boolean) => boolean)) => void;
-  publishData: () => { productsJson: string; settingsJson: string; } | undefined; // Added publishData
+  exportData: () => { products: Product[], orders: Order[], settings: SiteSettings };
+  importData: (data: { products?: Product[], orders?: Order[], settings?: SiteSettings }) => void;
+  clearAllData: () => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -57,37 +46,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [isAdminAuthenticated]);
 
 
-  const makeApiCall = async <T,>(url: string, method: string = 'GET', body?: any): Promise<T> => {
-    const options: RequestInit = {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-    };
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
-    const response = await fetch(url, options);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(errorData.message || `API call to ${url} failed with status ${response.status}`);
-    }
-    return response.json() as Promise<T>;
-  };
-
   // Products
   const fetchProducts = useCallback(async () => {
     try {
-      const data = await makeApiCall<Product[]>('/.netlify/functions/products');
+      const data = await dataService.getProducts();
       setProducts(data);
+      setError(null);
     } catch (err: any) {
       setError(err.message);
-      setProducts([]); 
+      setProducts([]);
     }
   }, []);
 
-  const addProduct = async (productData: Omit<Product, 'id' | 'images'> & { images: string[] }) => {
+  const addProduct = async (productData: Omit<Product, 'id'>) => {
     try {
-      const newProduct = await makeApiCall<Product>('/.netlify/functions/products', 'POST', productData);
+      const newProduct = await dataService.addProduct(productData);
       setProducts(prev => [...prev, newProduct]);
+      setError(null);
       return newProduct;
     } catch (err: any) {
       setError(err.message);
@@ -97,8 +72,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateProduct = async (productId: string, productData: Partial<Product>) => {
     try {
-      const updatedProduct = await makeApiCall<Product>(`/.netlify/functions/products/${productId}`, 'PUT', productData);
+      const updatedProduct = await dataService.updateProduct(productId, productData);
       setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
+      setError(null);
       return updatedProduct;
     } catch (err: any) {
       setError(err.message);
@@ -108,8 +84,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const deleteProduct = async (productId: string) => {
     try {
-      await makeApiCall<void>(`/.netlify/functions/products/${productId}`, 'DELETE');
+      await dataService.deleteProduct(productId);
       setProducts(prev => prev.filter(p => p.id !== productId));
+      setError(null);
     } catch (err: any) {
       setError(err.message);
       throw err;
@@ -119,23 +96,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Settings
   const fetchSettings = useCallback(async () => {
     try {
-      const data = await makeApiCall<SiteSettings>('/.netlify/functions/settings');
+      const data = await dataService.getSettings();
       setSettings(data);
+      setError(null);
     } catch (err: any) {
       setError(err.message);
-      setSettings(DEFAULT_SETTINGS); 
     }
   }, []);
 
   const updateSettings = async (newSettingsData: Partial<SiteSettings>) => {
     try {
-      // Ensure that when updating settings, we merge with existing settings or default if somehow current settings are null.
-      // However, `newSettingsData` is Partial<SiteSettings>, so it's expected to be merged with the full structure.
-      // The backend should handle the merging logic or expect a full SiteSettings object.
-      // For this client-side `updateSettings`, we pass the partial data, and the backend updates accordingly.
-      // The state `settings` is updated with the response from the backend.
-      const updatedSettings = await makeApiCall<SiteSettings>('/.netlify/functions/settings', 'PUT', newSettingsData);
+      const updatedSettings = await dataService.updateSettings(newSettingsData);
       setSettings(updatedSettings);
+      setError(null);
       return updatedSettings;
     } catch (err: any) {
       setError(err.message);
@@ -146,21 +119,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Orders
   const fetchOrders = useCallback(async () => {
     if (!isAdminAuthenticated) {
-        setOrders([]); 
+        setOrders([]);
         return;
     }
     try {
-      const data = await makeApiCall<Order[]>('/.netlify/functions/orders');
+      const data = await dataService.getOrders();
       setOrders(data);
+      setError(null);
     } catch (err: any) {
       setError(err.message);
-      setOrders([]); 
+      setOrders([]);
     }
   }, [isAdminAuthenticated]);
 
   const addOrder = async (orderData: Omit<Order, 'id' | 'orderDate' | 'status'>) => {
     try {
-      const newOrder = await makeApiCall<Order>('/.netlify/functions/orders', 'POST', orderData);
+      const newOrder = await dataService.addOrder(orderData);
+      setError(null);
       return newOrder;
     } catch (err: any) {
       setError(err.message);
@@ -170,8 +145,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
     try {
-      const updatedOrder = await makeApiCall<Order>(`/.netlify/functions/orders/${orderId}`, 'PUT', { status });
+      const updatedOrder = await dataService.updateOrderStatus(orderId, status);
       setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+      setError(null);
       return updatedOrder;
     } catch (err: any) {
       setError(err.message);
@@ -179,30 +155,37 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Publish Data
-  const publishData = useCallback((): { productsJson: string; settingsJson: string; } | undefined => {
-    if (!settings) { // If settings are not loaded, publishing them would be problematic.
-      console.warn("Settings not loaded. Cannot prepare data for publishing.");
-      return undefined;
-    }
-    try {
-      const productsJson = JSON.stringify(products, null, 2);
-      const settingsJson = JSON.stringify(settings, null, 2);
-      return { productsJson, settingsJson };
-    } catch (e) {
-      console.error("Error stringifying data for publish:", e);
-      // Provide fallback JSON strings so the AdminPublishDataPage doesn't break trying to access properties on undefined.
-      // Or return undefined and let AdminPublishDataPage handle it with a more generic error.
-      // Returning undefined is consistent with the "settings not loaded" case.
-      return undefined; 
-    }
-  }, [products, settings]);
+  // Data management functions
+  const exportData = useCallback(() => {
+    return dataService.exportData();
+  }, []);
+
+  const importData = useCallback((data: { products?: Product[], orders?: Order[], settings?: SiteSettings }) => {
+    dataService.importData(data);
+    // Refresh the state after import
+    fetchProducts();
+    fetchSettings();
+    fetchOrders();
+  }, [fetchProducts, fetchSettings, fetchOrders]);
+
+  const clearAllData = useCallback(() => {
+    dataService.clearAllData();
+    setProducts([]);
+    setOrders([]);
+    setSettings(null);
+    setError(null);
+  }, []);
 
 
   useEffect(() => {
     const initializeData = async () => {
       setIsLoading(true);
       setError(null);
+
+      // Initialize default data first
+      await dataService.initializeDefaultData();
+
+      // Then fetch all data
       await Promise.all([fetchProducts(), fetchSettings(), fetchOrders()]);
       setIsLoading(false);
     };
@@ -219,13 +202,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
   return (
-    <DataContext.Provider value={{ 
+    <DataContext.Provider value={{
       products, settings, orders, isLoading, error,
       fetchProducts, addProduct, updateProduct, deleteProduct,
       fetchSettings, updateSettings,
       fetchOrders, addOrder, updateOrderStatus,
       isAdminAuthenticated, setIsAdminAuthenticated,
-      publishData // Provide publishData through context
+      exportData, importData, clearAllData
     }}>
       {children}
     </DataContext.Provider>

@@ -14,7 +14,7 @@ import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminAddProductPage from './pages/admin/AdminAddProductPage';
 import AdminContactSettingsPage from './pages/admin/AdminContactSettingsPage';
 import AdminAppearanceSettingsPage from './pages/admin/AdminAppearanceSettingsPage';
-// AdminPublishDataPage is removed
+import AdminDataManagementPage from './pages/admin/AdminDataManagementPage';
 import { THEME_COLORS } from './constants';
 import { useData } from './contexts/DataContext';
 
@@ -78,7 +78,7 @@ const App: React.FC = () => {
                 <Route path="/admin/dashboard/add-product" element={<AdminAddProductPage />} />
                 <Route path="/admin/dashboard/contact-settings" element={<AdminContactSettingsPage />} />
                 <Route path="/admin/dashboard/appearance-settings" element={<AdminAppearanceSettingsPage />} />
-                {/* Removed /admin/dashboard/publish route */}
+                <Route path="/admin/dashboard/data-management" element={<AdminDataManagementPage />} />
                 <Route path="/admin/dashboard" element={<Navigate to="/admin/dashboard/orders" replace />} />
             </Route>
 

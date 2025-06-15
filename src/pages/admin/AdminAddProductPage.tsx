@@ -7,6 +7,7 @@ import { THEME_COLORS } from '../../constants';
 import { useNavigate } from 'react-router-dom';
 import { generateProductDescription, ImageInput } from '../../utils/geminiApi';
 import { useData } from '../../contexts/DataContext';
+import { imageService } from '../../services/imageService';
 
 const fileToImageInput = (file: File): Promise<ImageInput> => {
   return new Promise((resolve, reject) => {
@@ -44,6 +45,7 @@ const AdminAddProductPage: React.FC = () => {
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [descGenerationError, setDescGenerationError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [imageUploadProgress, setImageUploadProgress] = useState<string | null>(null);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -58,7 +60,19 @@ const AdminAddProductPage: React.FC = () => {
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedImageFiles(e.target.files);
+    const files = e.target.files;
+    if (files) {
+      // Validate each file
+      for (let i = 0; i < files.length; i++) {
+        const validation = imageService.validateImage(files[i]);
+        if (!validation.valid) {
+          setFormError(`خطأ في الصورة ${files[i].name}: ${validation.error}`);
+          return;
+        }
+      }
+      setFormError(null);
+    }
+    setSelectedImageFiles(files);
   };
 
   const handleSuggestDescription = async () => {
@@ -108,14 +122,30 @@ const AdminAddProductPage: React.FC = () => {
     }
 
     try {
-      const imagePromises = Array.from(selectedImageFiles).map(file => 
-        fileToImageInput(file).then(imgInput => `data:${imgInput.mimeType};base64,${imgInput.data}`)
-      );
-      const base64Images = await Promise.all(imagePromises);
+      setImageUploadProgress('جاري معالجة الصور...');
+
+      // Process images using imageService
+      const imageResults = await imageService.uploadImages(selectedImageFiles);
+
+      // Check for any failed uploads
+      const failedUploads = imageResults.filter(result => !result.success);
+      if (failedUploads.length > 0) {
+        throw new Error(`فشل في رفع ${failedUploads.length} صورة: ${failedUploads[0].error}`);
+      }
+
+      const processedImages = imageResults
+        .filter(result => result.success && result.imageUrl)
+        .map(result => result.imageUrl!);
+
+      if (processedImages.length === 0) {
+        throw new Error('لم يتم معالجة أي صورة بنجاح');
+      }
+
+      setImageUploadProgress('جاري حفظ المنتج...');
 
       const productPayload = {
         ...newProductData,
-        images: base64Images,
+        images: processedImages,
       };
 
       const addedProduct = await addProduct(productPayload);
@@ -125,7 +155,7 @@ const AdminAddProductPage: React.FC = () => {
       const fileInput = document.getElementById('imageFiles') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
-      setFeedback(`تمت إضافة المنتج "${addedProduct?.name}" بنجاح. التغييرات مباشرة الآن.`);
+      setFeedback(`تمت إضافة المنتج "${addedProduct?.name}" بنجاح مع ${processedImages.length} صورة.`);
       setTimeout(() => {
         setFeedback(null);
         // navigate('/admin/dashboard/products'); // Optionally navigate after success
@@ -135,6 +165,7 @@ const AdminAddProductPage: React.FC = () => {
       setFormError(`فشل إضافة المنتج: ${error.message || 'خطأ غير معروف'}`);
     } finally {
       setActionInProgress(false);
+      setImageUploadProgress(null);
     }
   };
 
@@ -143,6 +174,7 @@ const AdminAddProductPage: React.FC = () => {
       <h1 className={`text-3xl font-bold ${THEME_COLORS.accentGold} mb-8`}>إضافة منتج جديد</h1>
       {formError && <p className="text-red-400 bg-red-900/30 p-3 rounded-md mb-4">{formError}</p>}
       {feedback && <p className="text-green-400 bg-green-900/30 p-3 rounded-md mb-4">{feedback}</p>}
+      {imageUploadProgress && <p className="text-blue-400 bg-blue-900/30 p-3 rounded-md mb-4">{imageUploadProgress}</p>}
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input 

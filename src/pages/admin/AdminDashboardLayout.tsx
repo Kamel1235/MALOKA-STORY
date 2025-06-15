@@ -42,7 +42,7 @@ const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({ onLogout, c
     { name: 'إضافة منتج جديد', path: '/admin/dashboard/add-product', icon: "NecklaceIcon" },
     { name: 'إعدادات التواصل', path: '/admin/dashboard/contact-settings', icon: "ContactIcon" },
     { name: 'إعدادات المظهر', path: '/admin/dashboard/appearance-settings', icon: "OfferIcon" },
-    // { name: 'نشر التغييرات', path: '/admin/dashboard/publish', icon: "PublishIcon"}, // Removed
+    { name: 'إدارة البيانات', path: '/admin/dashboard/data-management', icon: "PublishIcon" },
   ];
 
   const activeStyle = `${THEME_COLORS.buttonGold} ${THEME_COLORS.textPrimary}`;
